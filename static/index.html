@@ -39,6 +39,20 @@
     .scan-label .t { font-size: 16px; font-weight: 600; letter-spacing: -.01em; color: #fff; }
     .scan-label .s { font-size: 12px; color: #94A3B8; }
     .scan-label .ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(16,185,129,.14); color: #34D399; border: 1px solid rgba(52,211,153,.35); }
+    /* Ürün kartı (Kemal 16 Kas 2026: büyük görsel/ad, sıkı ve kurumsal market satırları) */
+    .pc-thumb { width: 84px; height: 84px; }
+    .pc-name { font-size: 15.5px; line-height: 1.3; font-weight: 600; color: #0F172A; }
+    .pc-best { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+    .pc-best b { font-size: 19px; font-weight: 700; color: #047857; letter-spacing: -.01em; }
+    .pc-best span { font-size: 12px; color: #64748B; }
+    .pc-rows { border: 1px solid #EEF2F6; border-radius: 12px; overflow: hidden; }
+    .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-top: 1px solid #EEF2F6; color: inherit; text-decoration: none; }
+    .pc-row:first-child { border-top: 0; }
+    a.pc-row:hover { background: #F8FAFC; }
+    .pc-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 70px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
+    .pc-price { font-size: 13.5px; font-weight: 600; color: #1E293B; }
+    .pc-row.win .pc-price { color: #047857; font-weight: 700; }
+    .pc-unit { font-size: 11px; color: #94A3B8; margin-right: 8px; }
     .scan-mini { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 14px; margin-left: 6px; border-radius: 11px; overflow: hidden; cursor: pointer;
       background: radial-gradient(140% 160% at 50% 0%, #1E293B 0%, #0B1220 70%); color: #fff; font-size: 13.5px; font-weight: 600; white-space: nowrap;
       border: 1px solid rgba(52,211,153,.45); box-shadow: 0 0 0 3px rgba(16,185,129,.10), 0 6px 16px -8px rgba(2,6,23,.6); }
@@ -1466,32 +1480,20 @@
           const destUrl = q.tracked_url || "";
 
           const content = `
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-2 h-2 rounded-full shrink-0" style="background:${st.accent}"></span>
-              <span class="text-xs ${isLowest ? 'font-semibold text-slate-900' : 'font-medium text-slate-600'} truncate">${escapeHtml(st.short)}</span>
-              ${isLowest ? '<span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-semibold">En Uygun</span>' : ''}
-            </div>
-            <div class="text-right shrink-0 num">
-              <span class="text-xs ${isLowest ? 'font-bold text-emerald-700' : 'font-semibold text-slate-800'}">${packStr}</span>
-              ${unitStr ? `<span class="block text-[10px] text-slate-400">${escapeHtml(unitStr)}</span>` : ""}
-            </div>
+            <span class="pc-chip" style="background:${st.accent};color:${st.textOnAccent || '#fff'}">${escapeHtml(st.short)}</span>
+            <span class="num" style="display:flex;align-items:baseline;white-space:nowrap">
+              ${unitStr ? `<span class="pc-unit">${escapeHtml(unitStr)}</span>` : ""}
+              <span class="pc-price">${packStr}</span>
+            </span>
           `;
-
+          const cls = "pc-row" + (isLowest ? " win" : "");
           if (destUrl) {
-            return `
-              <a
-                href="${escapeHtml(destUrl)}"
-                target="_blank"
-                rel="noopener"
-                onclick="event.stopPropagation()"
-                class="flex items-center justify-between gap-2 px-3 py-2 hover:bg-slate-100/80 transition ${isLowest ? 'bg-emerald-50/40' : ''}"
-              >
-                ${content}
-              </a>
-            `;
+            return `<a href="${escapeHtml(destUrl)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" class="${cls}">${content}</a>`;
           }
-          return `<div class="flex items-center justify-between gap-2 px-3 py-2 ${isLowest ? 'bg-emerald-50/40' : ''}">${content}</div>`;
+          return `<div class="${cls}">${content}</div>`;
         }).join("");
+        const bestQ = quotes[0];
+        const bestHtml = bestQ ? `<div class="pc-best num"><b>${Number(bestQ.pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</b><span>en ucuz · ${escapeHtml(getBrandStyle(bestQ.platform, true).short)}</span></div>` : "";
 
         return `
           <article
@@ -1501,7 +1503,7 @@
             <div class="space-y-3">
               <!-- Ürün Başlığı -->
               <div class="flex items-start gap-3">
-                ${renderProductThumb(p.image_url, p.brand, p.category, "w-14 h-14")}
+                ${renderProductThumb(p.image_url, p.brand, p.category, "pc-thumb")}
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center justify-between gap-2">
                     <span class="text-[11px] font-medium text-slate-500 uppercase tracking-wide truncate">${escapeHtml(p.brand)}</span>
@@ -1512,17 +1514,15 @@
                         : "")
                     }
                   </div>
-                  <h2 class="text-sm font-semibold text-slate-900 leading-snug line-clamp-2 mt-0.5 group-hover:text-emerald-700 transition">
+                  <h2 class="pc-name line-clamp-2 mt-0.5 group-hover:text-emerald-700 transition">
                     ${escapeHtml(p.family_name)}
                   </h2>
-                  <div class="text-[11px] text-slate-400 mt-0.5 num">
-                    ${p.offer_count} mağaza karşılaştırıldı
-                  </div>
+                  ${bestHtml}
                 </div>
               </div>
 
               <!-- Mağaza Fiyat Satırları -->
-              <div class="rounded-xl border border-slate-100 bg-slate-50/60 divide-y divide-slate-100 overflow-hidden">
+              <div class="pc-rows">
                 ${rowsHtml}
               </div>
             </div>
