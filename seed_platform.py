@@ -3,6 +3,8 @@ dipci.tr — Başlangıç Katalog, 90 Günlük Fiyat Hafızası, Barkod Havuzu v
 Uygulama ilk kez ayağa kalktığında gerçekçi Türkiye piyasa verisiyle veritabanını hazırlar.
 """
 
+import hashlib
+import os
 from datetime import datetime, timedelta
 from typing import Dict, List
 
@@ -11,41 +13,67 @@ from scanner import compute_ean13_with_check
 from social_community import SocialCommunityService
 
 
-VS_COMPARISONS: Dict[str, Dict] = {
-    "fairy_platinum_plus": {
-        "rival_name": "Finish Quantum Max Kapsül",
-        "rows": [
-            {"label": "1 Yıkama En Dip Maliyeti", "a": "5,19 TL (Kazanan)", "b": "6,40 TL", "win": "a"},
-            {"label": "Kısa Programda Çözünme", "a": "Çok Hızlı (3 Sıvı Bölmeli)", "b": "Orta", "win": "a"},
-            {"label": "Ön Yıkamasız Yağ Sökme", "a": "Yüksek", "b": "Yüksek", "win": "tie"},
-        ],
-    },
-    "philips_aqua_8000": {
-        "rival_name": "Dyson V12 Detect Slim Absolute",
-        "rows": [
-            {"label": "Taksitli Reel Maliyet", "a": "15.684 TL (9 Taksit)", "b": "24.999 TL (Tek Çekim)", "win": "a"},
-            {"label": "Islak Silme (Mop) Başlığı", "a": "Var (Aqua Plus Başlık)", "b": "Yok", "win": "a"},
-            {"label": "Gövde Ağırlığı", "a": "2,9 kg", "b": "2,2 kg (Daha Hafif)", "win": "b"},
-            {"label": "Maksimum Pil Süresi", "a": "80 Dakika", "b": "60 Dakika", "win": "a"},
-        ],
-    },
-    "sutas_kasar_peyniri": {
-        "rival_name": "Geçen Ayki 1000g Eski Kalıp",
-        "rows": [
-            {"label": "Paket Net Gramajı", "a": "850 g (Yeni Kalıp)", "b": "1.000 g (Eski Kalıp)", "win": "b"},
-            {"label": "1 Kg Gerçek Birim Fiyat", "a": "382,35 TL / kg", "b": "340,00 TL / kg", "win": "b"},
-            {"label": "Süt Yağ Oranı", "a": "Tam Yağlı (%45)", "b": "Tam Yağlı (%45)", "win": "tie"},
-        ],
-    },
-    "prima_premium_care_4": {
-        "rival_name": "Molfix Pure & Soft 4 Numara",
-        "rows": [
-            {"label": "1 Adet Bez Birim Fiyatı", "a": "6,45 TL / adet", "b": "5,20 TL / adet", "win": "b"},
-            {"label": "Gece Sızdırmazlık & Yumuşaklık", "a": "Çok Yüksek (12 Saat)", "b": "İyi", "win": "a"},
-            {"label": "Islaklık Göstergesi", "a": "Var", "b": "Var", "win": "tie"},
-        ],
-    },
-}
+# Not: Eskiden burada kaynaksız karşılaştırma tabloları vardı (ör. "Sütaş 1000 g'dan 850 g'a küçüldü").
+# Doğrulanmamış iddia olduğu için kaldırıldı; ürün sayfası bu alanı boş gösterir.
+VS_COMPARISONS: Dict[str, Dict] = {}
+
+
+# ----------------- Eski demo verisinin temizliği -----------------
+# İlk kurulumda seed ile yazılmış uydurma fiyat kayıtları (ürün anahtarı + başlık birebir)
+DEMO_SNAPSHOT_KEYS = [
+    ("fairy_platinum_plus", "Fairy Platinum Plus 50'li"),
+    ("philips_aqua_8000", "Philips XC8057/01"),
+    ("sutas_kasar_peyniri", "Sütaş Kaşar 1000g"),
+    ("prima_premium_care_4", "Prima Premium Care 4 Beden 108'li"),
+    ("fairy_platinum_plus", "Fairy Platinum Plus 100 Yıkama (2x50) • Prime"),
+    ("fairy_platinum_plus", "Fairy Platinum Plus 75 Yıkama"),
+    ("fairy_platinum_plus", "Fairy Platinum Plus 50 Yıkama • 45 Dk Teslimat"),
+    ("fairy_platinum_plus", "Fairy Platinum Plus 150 Yıkama Dev Koli"),
+    ("fairy_platinum_plus", "Fairy 100'lü Fırsat"),
+    ("bim_bind_activit", "Bind Activit Premium 50 Kapsül"),
+    ("philips_aqua_8000", "Philips 8000 Aqua Plus XC8057/01 • Peşin Fiyatına 9 Taksit"),
+    ("philips_aqua_8000", "Philips XC8057/01 • Mağazadan 1 Saatte Gel-Al"),
+    ("philips_aqua_8000", "Philips XC8057/01 • Peşin Fiyatına 3 Taksit"),
+    ("sutas_kasar_peyniri", "Sütaş Tam Yağlı Taze Kaşar 850 g (Yeni Paket)"),
+    ("sutas_kasar_peyniri", "Sütaş Taze Kaşar 700 g"),
+    ("a101_ahir_kasar", "Ahir Tam Yağlı Taze Kaşar 1000 g"),
+    ("prima_premium_care_4", "Prima Premium Care 4 Beden 108 Adet Aylık Paket"),
+    ("prima_premium_care_4", "Prima Premium Care 4 Beden 108 Adet"),
+]
+# Seed'in uydurduğu barkodlar (gerçek GS1 kaydı değil)
+DEMO_BARCODE_BASES = ["869050651412", "869050653910", "872038902914", "869052608501", "869050681084"]
+# Seed'in oluşturduğu sahte üyelerin telefon numaraları ("Ayşe Kaya", "Burak Demir")
+DEMO_MEMBER_PHONES = ["5321112233", "5442223344"]
+
+
+def purge_demo_seed_data(conn) -> dict:
+    """Seed ile yazılmış uydurma fiyat, satıcı, barkod, üye, yorum ve fırsat kayıtlarını siler."""
+    stats = {"snapshots": 0, "barcodes": 0, "members": 0, "posts": 0, "deals": 0}
+    for pkey, title in DEMO_SNAPSHOT_KEYS:
+        cur = conn.execute("DELETE FROM price_snapshots WHERE product_key = ? AND title = ?", (pkey, title))
+        stats["snapshots"] += cur.rowcount or 0
+
+    for base in DEMO_BARCODE_BASES:
+        gtin = compute_ean13_with_check(base)
+        cur = conn.execute("DELETE FROM product_barcodes WHERE gtin = ?", (gtin,))
+        stats["barcodes"] += cur.rowcount or 0
+
+    salt = SocialCommunityService.PHONE_HASH_SALT
+    hashes = [hashlib.sha256(f"{salt}:{d}".encode("utf-8")).hexdigest() for d in DEMO_MEMBER_PHONES]
+    try:
+        ph = ",".join("?" for _ in hashes)
+        ids = [r[0] for r in conn.execute(f"SELECT member_id FROM verified_members WHERE phone_hash IN ({ph})", hashes)]
+        if ids:
+            ip = ",".join("?" for _ in ids)
+            stats["posts"] = conn.execute(f"DELETE FROM product_social_posts WHERE member_id IN ({ip})", ids).rowcount or 0
+            stats["deals"] = conn.execute(f"DELETE FROM community_deals WHERE member_id IN ({ip})", ids).rowcount or 0
+            conn.execute(f"DELETE FROM post_helpful_votes WHERE member_id IN ({ip})", ids)
+            conn.execute(f"DELETE FROM deal_temperature_votes WHERE member_id IN ({ip})", ids)
+            stats["members"] = conn.execute(f"DELETE FROM verified_members WHERE member_id IN ({ip})", ids).rowcount or 0
+    except Exception:
+        pass  # sosyal tablolar henüz yoksa sorun değil
+    conn.commit()
+    return stats
 
 
 def ensure_seeded(db: PriceMemoryDB, social: SocialCommunityService) -> None:
@@ -63,6 +91,16 @@ def ensure_seeded(db: PriceMemoryDB, social: SocialCommunityService) -> None:
         """
     )
     db.conn.commit()
+
+    # Canlıda her açılışta eski demo/uydurma kayıtları temizle (idempotent)
+    purged = purge_demo_seed_data(db.conn)
+    if purged["snapshots"]:
+        db.rebuild_catalog_index(sorted({k for k, _ in DEMO_SNAPSHOT_KEYS}))
+
+    # Demo katalog yalnızca yerel geliştirmede, açıkça istenirse yazılır.
+    # Canlıda uydurma fiyat, satıcı, üye ve yorum OLMAMALI.
+    if os.getenv("DIPCI_DEMO_SEED", "0").strip() != "1":
+        return
 
     existing = db.conn.execute("SELECT COUNT(*) AS cnt FROM canonical_products").fetchone()
     if existing and existing["cnt"] > 0:
