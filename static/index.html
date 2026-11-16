@@ -18,6 +18,44 @@
     .num { font-variant-numeric: tabular-nums; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    /* Fotoğrafla bul: tarayıcı ekranı (Kemal, 16 Kas 2026) */
+    .scan-screen { position: relative; display: block; width: 100%; aspect-ratio: 16 / 7; min-height: 150px; border-radius: 18px; overflow: hidden; cursor: pointer;
+      background: radial-gradient(120% 140% at 50% 0%, #1E293B 0%, #0B1220 60%, #050A14 100%); border: 1px solid #1E293B;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 10px 30px -12px rgba(2,6,23,.55); transition: transform .15s ease, box-shadow .15s ease; text-align: center; }
+    .scan-screen:hover { box-shadow: inset 0 0 0 1px rgba(16,185,129,.35), 0 14px 34px -12px rgba(2,6,23,.6); }
+    .scan-screen:active { transform: scale(.99); }
+    .scan-screen:focus-visible { outline: 3px solid #10B981; outline-offset: 3px; }
+    .scan-screen::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(148,163,184,.07) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,.07) 1px, transparent 1px); background-size: 22px 22px; }
+    .scan-corner { position: absolute; width: 26px; height: 26px; border-color: #34D399; border-style: solid; border-width: 0; opacity: .9; }
+    .scan-corner.tl { top: 14px; left: 14px; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 8px; }
+    .scan-corner.tr { top: 14px; right: 14px; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 8px; }
+    .scan-corner.bl { bottom: 14px; left: 14px; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 8px; }
+    .scan-corner.br { bottom: 14px; right: 14px; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 8px; }
+    .scan-line { position: absolute; left: 6%; right: 6%; height: 2px; top: 12%; border-radius: 2px; background: #34D399;
+      box-shadow: 0 0 10px 2px rgba(52,211,153,.75), 0 0 28px 6px rgba(16,185,129,.35); animation: scanMove 2.6s ease-in-out infinite alternate; }
+    .scan-line::after { content: ""; position: absolute; left: 0; right: 0; bottom: 2px; height: 46px; background: linear-gradient(to top, rgba(52,211,153,.22), transparent); }
+    @keyframes scanMove { from { top: 12%; } to { top: 86%; } }
+    .scan-label { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #E2E8F0; padding: 0 24px; }
+    .scan-label .t { font-size: 16px; font-weight: 600; letter-spacing: -.01em; color: #fff; }
+    .scan-label .s { font-size: 12px; color: #94A3B8; }
+    .scan-label .ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(16,185,129,.14); color: #34D399; border: 1px solid rgba(52,211,153,.35); }
+    .scan-mini { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 14px; margin-left: 6px; border-radius: 11px; overflow: hidden; cursor: pointer;
+      background: radial-gradient(140% 160% at 50% 0%, #1E293B 0%, #0B1220 70%); color: #fff; font-size: 13.5px; font-weight: 600; white-space: nowrap;
+      border: 1px solid rgba(52,211,153,.45); box-shadow: 0 0 0 3px rgba(16,185,129,.10), 0 6px 16px -8px rgba(2,6,23,.6); }
+    .scan-mini:hover { box-shadow: 0 0 0 4px rgba(16,185,129,.18), 0 8px 18px -8px rgba(2,6,23,.6); }
+    .scan-mini:focus-visible { outline: 3px solid #10B981; outline-offset: 2px; }
+    .scan-mini svg { color: #34D399; position: relative; z-index: 1; }
+    .scan-mini span { position: relative; z-index: 1; }
+    .scan-mini .scan-line { left: 8%; right: 8%; height: 1.5px; animation: scanMoveMini 1.8s ease-in-out infinite alternate; }
+    .scan-mini .scan-line::after { height: 14px; }
+    @keyframes scanMoveMini { from { top: 14%; } to { top: 82%; } }
+    .scan-tile { position: relative; display: flex; align-items: center; justify-content: center; width: 46px; height: 34px; margin-top: -14px; border-radius: 11px; overflow: hidden;
+      background: radial-gradient(140% 160% at 50% 0%, #1E293B 0%, #0B1220 70%); border: 1px solid rgba(52,211,153,.55); box-shadow: 0 0 0 3px rgba(16,185,129,.12), 0 6px 14px -6px rgba(2,6,23,.6); }
+    .scan-tile svg { color: #34D399; position: relative; z-index: 1; }
+    .scan-tile .scan-line { left: 10%; right: 10%; height: 1.5px; animation: scanMoveMini 1.8s ease-in-out infinite alternate; }
+    .scan-tile .scan-line::after { height: 10px; }
+    .scan-fill .scan-screen { height: 100%; aspect-ratio: auto; min-height: 0; border-radius: 12px; }
+    @media (prefers-reduced-motion: reduce) { .scan-line, .scan-mini .scan-line, .scan-tile .scan-line { animation: none; top: 50%; } }
   </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen flex flex-col pb-20 md:pb-0">
@@ -46,13 +84,10 @@
           <button onclick="switchMainView('custom_basket')" id="dtab-custom_basket" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Kendi Sepetim
           </button>
-          <button onclick="switchMainView('scanner')" id="dtab-scanner" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
-            <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
-              <circle cx="12" cy="13" r="3.2" />
-            </svg>
-            <span>Fotoğrafla Bul</span>
-          </button>
+          <label class="scan-mini" role="button" tabindex="0" aria-label="Fotoğrafla Bul: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
+            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Fotoğrafla Bul</span>
+            <input id="navScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
+          </label>
         </nav>
       </div>
 
@@ -152,13 +187,11 @@
       </svg>
       <span>Listem</span>
     </button>
-    <button onclick="switchMainView('scanner')" id="mtab-scanner" class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium text-slate-500">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
-        <circle cx="12" cy="13" r="3.2" />
-      </svg>
-      <span>Kamera</span>
-    </button>
+    <label class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-900 cursor-pointer" aria-label="Fotoğrafla Bul: kamerayı aç">
+      <span class="scan-tile"><span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
+      <span>Fotoğrafla</span>
+      <input id="tabScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
+    </label>
   </nav>
 
   <!-- ÜYE GİRİŞİ MODALI -->
@@ -2477,6 +2510,29 @@
       }
     }
 
+    function scanScreenHtml(inputId, onchangeJs, title, sub) {
+      return `
+        <label class="scan-screen" role="button" tabindex="0" aria-label="${title}: kamerayı aç"
+          onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('${inputId}').click()}">
+          <span class="scan-corner tl"></span><span class="scan-corner tr"></span><span class="scan-corner bl"></span><span class="scan-corner br"></span>
+          <span class="scan-line"></span>
+          <span class="scan-label">
+            <span class="ic"><svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
+            <span class="t">${title}</span>
+            <span class="s">${sub}</span>
+          </span>
+          <input id="${inputId}" type="file" accept="image/*" capture="environment" onchange="${onchangeJs}" style="display:none" />
+        </label>`;
+    }
+
+    async function handleHomeScanUpload(inputEl) {
+      const file = inputEl && inputEl.files && inputEl.files[0];
+      if (!file) return;
+      await switchMainView("scanner");
+      await processImageBlobForLens(file);
+      try { inputEl.value = ""; } catch (_) {}
+    }
+
     async function handleShelfPhotoUpload(inputEl) {
       const file = inputEl && inputEl.files && inputEl.files[0];
       if (!file) return;
@@ -2621,20 +2677,7 @@
                 }
 
                 ${!isCamOpen && !uploadedPhotoPreviewUrl ? `
-                  <div class="text-center space-y-2 max-w-xs">
-                    <div class="w-10 h-10 rounded-xl bg-white border border-slate-200 mx-auto flex items-center justify-center text-slate-500">
-                      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
-                        <circle cx="12" cy="13" r="3.2" />
-                      </svg>
-                    </div>
-                    <div class="text-xs sm:text-sm font-medium text-slate-800">
-                      Ürün fotoğrafı çekin veya görsel yükleyin
-                    </div>
-                    <div class="text-[11px] text-slate-400 leading-relaxed">
-                      Ambalaj, etiket, barkod veya ürün görseli ile arama yapabilirsiniz.
-                    </div>
-                  </div>
+                  <div class="absolute inset-0 scan-fill">${scanScreenHtml("scanScreenInput", "handleShelfPhotoUpload(this)", "Fotoğraf Çek", "Dokun, kamera açılsın · ürünü, kutuyu ya da barkodu çek")}</div>
                 ` : ""}
 
                 ${appState.lensLoading ? `
