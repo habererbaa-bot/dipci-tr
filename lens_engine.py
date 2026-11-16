@@ -609,6 +609,61 @@ class DipciLensEngine:
 
         return None
 
+    def _recognize_with_coarena_if_configured(self, raw_bytes: bytes, mime_type: str) -> Optional[Dict]:
+        """Fotoğrafı Coarena (OpenAI uyumlu) görüntü modelleriyle tanır: önce gpt-6-luna, olmazsa gemini-3-8-flash.
+        Model emin değilse boş ürün adı döner; uydurma ürün gösterilmez (Kemal, 16 Kas 2026)."""
+        api_key = os.getenv("COARENA_API_KEY", "").strip()
+        if not api_key or not raw_bytes:
+            return None
+        b64 = base64.b64encode(raw_bytes).decode("ascii")
+        prompt = (
+            "Görseldeki ürünü tanı (market ürünü, gıda, temizlik, elektronik, kozmetik, mobilya, ev eşyası, giyim vb.). "
+            "Marka/model ancak görselde okunuyorsa ya da kesin tanınıyorsa yazılır; tahmin edilmez. "
+            "Ürünün ne olduğundan emin değilsen product_name boş bırakılır. "
+            "product_name, Türkiye'deki e-ticaret sitelerinde aranacak kısa Türkçe addır (varsa marka + ürün türü + belirgin özellik; örn: 'kolçaksız döner çalışma koltuğu'). "
+            "SADECE geçerli JSON döndür:\n"
+            '{"brand": "", "product_name": "", "pack_label": "Varsa gramaj/hacim/adet", '
+            '"gtin": "Görünüyorsa barkod rakamları", "category_label": "Kısa kategori adı", '
+            '"short_info": "Ürün hakkında 1 cümlelik Türkçe bilgi"}'
+        )
+        for model in ("gpt-6-luna", "gemini-3-8-flash"):
+            try:
+                payload = {
+                    "model": model,
+                    "messages": [{"role": "user", "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type or 'image/jpeg'};base64,{b64}"}},
+                    ]}],
+                    "max_tokens": 2000,
+                    "reasoning_effort": "low",
+                    "temperature": 0.1,
+                }
+                req = urllib.request.Request(
+                    "https://coarena.ai/api/v1/chat/completions",
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=25) as resp:
+                    body = json.loads(resp.read().decode("utf-8", errors="replace"))
+                txt = str((body.get("choices") or [{}])[0].get("message", {}).get("content") or "").strip()
+                m = re.search(r"\{.*\}", txt, re.S)
+                if not m:
+                    continue
+                parsed = json.loads(m.group(0))
+                return {
+                    "brand": str(parsed.get("brand") or "").strip(),
+                    "product_name": str(parsed.get("product_name") or "").strip(),
+                    "pack_label": str(parsed.get("pack_label") or "").strip(),
+                    "gtin": "".join(c for c in str(parsed.get("gtin") or "") if c.isdigit()),
+                    "category_label": str(parsed.get("category_label") or "").strip(),
+                    "short_info": str(parsed.get("short_info") or "").strip(),
+                    "mode": f"coarena_vision:{model}",
+                }
+            except Exception:
+                continue
+        return None
+
     def _recognize_with_gemini_if_configured(self, raw_bytes: bytes, mime_type: str) -> Optional[Dict]:
         api_key = os.getenv("GEMINI_API_KEY", "").strip()
         if not api_key or not raw_bytes:
@@ -1281,17 +1336,22 @@ class DipciLensEngine:
         if not recog and clean_gtin:
             recog = self._lookup_barcode_everywhere(clean_gtin)
 
-        # Adım 3: Gemini Vision (yapılandırılmışsa)
+        # Adım 3: Coarena görüntü modeli (gpt-6-luna → gemini-3-8-flash). Model cevap verdiyse
+        # sonucuna güvenilir; emin değilse boş döner ve kullanıcıdan ürün adı istenir (uydurma yok).
+        coarena_answered = False
+        if not recog and raw_bytes:
+            recog = self._recognize_with_coarena_if_configured(raw_bytes, mime_type)
+            coarena_answered = recog is not None
+
+        # Adım 4: Gemini Vision (yapılandırılmışsa)
         if not recog and raw_bytes:
             recog = self._recognize_with_gemini_if_configured(raw_bytes, mime_type)
 
-        # Adım 4: Yerel ONNX Görsel Ambalaj & Etiket Okuyucu (Sıfır API Anahtarı)
-        if not recog and raw_bytes:
+        # Adım 5: Yerel ONNX Görsel Ambalaj & Etiket Okuyucu — yalnız görüntü modeli hiç cevap vermediyse
+        if not recog and raw_bytes and not coarena_answered:
             recog = self._recognize_with_onnx_visual_ocr(raw_bytes, pil_img=pil_img)
 
-        # Adım 5: Yazısız/barkodsuz günlük nesne tanıma (kupa, mouse, ayakkabı, meyve, saat vb.)
-        if not recog and pil_img is not None:
-            recog = self._recognize_everyday_object_onnx(pil_img)
+        # Küçük yerel nesne modeli (MobileNet) KALDIRILDI: ofis koltuğuna "sallanan sandalye" diyordu (Kemal, 16 Kas 2026).
 
         if not recog or not (recog.get("product_name") or recog.get("brand")):
             return {
