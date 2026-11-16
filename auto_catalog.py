@@ -1557,8 +1557,8 @@ class AutoCatalogEngine:
                 if pk:
                     enriched += 1
                     offers_added += len(offers)
-                    if enriched % 20 == 0:
-                        self.db.conn.commit()
+                # Her üründen sonra kaydet: uzun yazma kilidi siteyi ve radarı kilitliyordu (17 Kas 2026).
+                self.db.conn.commit()
             time.sleep(1.2)
         self.db.conn.commit()
         try:

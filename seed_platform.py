@@ -2,6 +2,7 @@
 dipci.tr — Başlangıç Katalog, 90 Günlük Fiyat Hafızası, Barkod Havuzu ve Doğrulanmış Topluluk Verisi
 Uygulama ilk kez ayağa kalktığında gerçekçi Türkiye piyasa verisiyle veritabanını hazırlar.
 """
+import sqlite3
 
 import hashlib
 import os
@@ -93,7 +94,12 @@ def ensure_seeded(db: PriceMemoryDB, social: SocialCommunityService) -> None:
     db.conn.commit()
 
     # Canlıda her açılışta eski demo/uydurma kayıtları temizle (idempotent)
-    purged = purge_demo_seed_data(db.conn)
+    # Veritabanı o an meşgulse site açılışı çökmesin; temizlik bir sonraki açılışta yapılır (17 Kas 2026).
+    try:
+        purged = purge_demo_seed_data(db.conn)
+    except sqlite3.OperationalError:
+        db.conn.rollback()
+        purged = {"snapshots": 0}
     if purged["snapshots"]:
         db.rebuild_catalog_index(sorted({k for k, _ in DEMO_SNAPSHOT_KEYS}))
 
