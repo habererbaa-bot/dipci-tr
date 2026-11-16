@@ -11,3 +11,4 @@ venv/
 .venv/
 *.zip
 node_modules/
+secrets/
