@@ -1274,12 +1274,12 @@ class AutoCatalogEngine:
             headers={
                 "Content-Type": "application/json",
                 "Accept": "application/json",
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "User-Agent": "DipciBot/1.0",
             },
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=15) as resp:
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
             return (data.get("content") or []), int(data.get("numberOfFound") or 0)
         except Exception:
@@ -1295,7 +1295,7 @@ class AutoCatalogEngine:
         total_pages = (total_found + size - 1) // size if total_found > 0 else 1
         target_pages = min(max_pages, max(1, total_pages))
         for p in range(1, target_pages):
-            time.sleep(0.08)
+            time.sleep(0.6)  # yavaş tarama (16 Kas: hızlı tarama kesildi)
             more, _ = cls._fetch_mf_seed(seed_query, size=size, page=p)
             if not more:
                 break
@@ -1366,7 +1366,7 @@ class AutoCatalogEngine:
                     active_seeds.append((q, c))
         clusters: Dict[str, Dict] = {}
 
-        with ThreadPoolExecutor(max_workers=3) as pool:
+        with ThreadPoolExecutor(max_workers=1) as pool:
             fut_map = {
                 pool.submit(self._fetch_mf_seed_pages, q, max_pages, 24): (q, cat_hint)
                 for q, cat_hint in active_seeds
