@@ -84,8 +84,8 @@
           <button onclick="switchMainView('custom_basket')" id="dtab-custom_basket" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Kendi Sepetim
           </button>
-          <label class="scan-mini" role="button" tabindex="0" aria-label="Fotoğrafla Bul: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
-            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Fotoğrafla Bul</span>
+          <label class="scan-mini" role="button" tabindex="0" aria-label="Ürün ya da barkod tara: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
+            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Ürün / Barkod Tara</span>
             <input id="navScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
           </label>
         </nav>
@@ -187,9 +187,9 @@
       </svg>
       <span>Listem</span>
     </button>
-    <label class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-900 cursor-pointer" aria-label="Fotoğrafla Bul: kamerayı aç">
+    <label class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-900 cursor-pointer" aria-label="Ürün ya da barkod tara: kamerayı aç">
       <span class="scan-tile"><span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
-      <span>Fotoğrafla</span>
+      <span>Tara</span>
       <input id="tabScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
     </label>
   </nav>
@@ -2677,7 +2677,7 @@
                 }
 
                 ${!isCamOpen && !uploadedPhotoPreviewUrl ? `
-                  <div class="absolute inset-0 scan-fill">${scanScreenHtml("scanScreenInput", "handleShelfPhotoUpload(this)", "Fotoğraf Çek", "Dokun, kamera açılsın · ürünü, kutuyu ya da barkodu çek")}</div>
+                  <div class="absolute inset-0 scan-fill">${scanScreenHtml("scanScreenInput", "handleShelfPhotoUpload(this)", "Ürünü ya da Barkodu Tara", "Dokun, kamera açılsın · elindeki ürünü ya da barkodunu göster")}</div>
                 ` : ""}
 
                 ${appState.lensLoading ? `
