@@ -31,7 +31,7 @@ User=www-data
 Group=www-data
 WorkingDirectory=$APP_DIR
 EnvironmentFile=$APP_DIR/.env
-ExecStart=$APP_DIR/venv/bin/uvicorn web_app:app --host 127.0.0.1 --port 8090 --workers 2 --proxy-headers
+ExecStart=$APP_DIR/venv/bin/uvicorn web_app:app --host 127.0.0.1 --port 8090 --workers 2 --proxy-headers --no-server-header
 Restart=always
 RestartSec=3
 

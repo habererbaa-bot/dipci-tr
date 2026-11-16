@@ -12,4 +12,4 @@ COPY . .
 RUN mkdir -p /app/data
 
 EXPOSE 8090
-CMD ["uvicorn", "web_app:app", "--host", "0.0.0.0", "--port", "8090", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD ["uvicorn", "web_app:app", "--host", "0.0.0.0", "--port", "8090", "--proxy-headers", "--forwarded-allow-ips", "*", "--no-server-header"]

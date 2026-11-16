@@ -7,8 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <link rel="stylesheet" href="/static/app.css" />
   <style>
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -33,21 +32,21 @@
 
         <!-- Masaüstü Ana Navigasyon -->
         <nav aria-label="Ana Menü" class="hidden md:flex items-center gap-1">
-          <button onclick="switchMainView('vitrin')" id="dtab-vitrin" class="px-3.5 py-2 rounded-lg text-sm font-medium transition text-slate-900 bg-slate-100">
-            Fiyat Karşılaştır
+          <button onclick="switchMainView('vitrin')" id="dtab-vitrin" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-900 bg-slate-100">
+            Fiyatlar
           </button>
-          <button onclick="switchMainView('deals')" id="dtab-deals" class="px-3.5 py-2 rounded-lg text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
-            <span>Gerçek İndirimler</span>
+          <button onclick="switchMainView('deals')" id="dtab-deals" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
+            <span>İndirimler</span>
             <span id="hdrDropsCount" class="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold leading-none num">0</span>
           </button>
-          <button onclick="switchMainView('basket')" id="dtab-basket" class="px-3.5 py-2 rounded-lg text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
-            <span>Market Sepeti</span>
+          <button onclick="switchMainView('basket')" id="dtab-basket" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
+            <span>Sepet</span>
             <span id="hdrBasketCount" class="px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-700 text-[11px] font-semibold leading-none num">0</span>
           </button>
-          <button onclick="switchMainView('custom_basket')" id="dtab-custom_basket" class="px-3.5 py-2 rounded-lg text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+          <button onclick="switchMainView('custom_basket')" id="dtab-custom_basket" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Kendi Sepetim
           </button>
-          <button onclick="switchMainView('scanner')" id="dtab-scanner" class="px-3.5 py-2 rounded-lg text-sm font-medium transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
+          <button onclick="switchMainView('scanner')" id="dtab-scanner" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50 inline-flex items-center gap-1.5">
             <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
               <circle cx="12" cy="13" r="3.2" />
@@ -638,6 +637,17 @@
       try {
         const { data } = await apiFetch("/api/auth/config");
         googleClientIdCache = (data && data.google_client_id) || "";
+        // Google betiği yalnızca Google girişi etkinse yüklenir (her sayfada ~90 KB tasarruf)
+        if (googleClientIdCache && !(window.google && window.google.accounts)) {
+          await new Promise((resolve) => {
+            const sc = document.createElement("script");
+            sc.src = "https://accounts.google.com/gsi/client";
+            sc.async = true;
+            sc.onload = resolve;
+            sc.onerror = resolve;
+            document.head.appendChild(sc);
+          });
+        }
         if (googleClientIdCache && window.google && window.google.accounts && window.google.accounts.id) {
           window.google.accounts.id.initialize({
             client_id: googleClientIdCache,
@@ -831,7 +841,7 @@
       if (appState.filterMinStores > 0) params.set("min_stores", String(appState.filterMinStores));
       if (appState.vitrinSort) params.set("sort", appState.vitrinSort);
       params.set("page", String(appState.vitrinPage || 1));
-      params.set("limit", "72");
+      params.set("limit", window.innerWidth < 640 ? "24" : "48");
       if (live) params.set("live", "1");
 
       const { data } = await apiFetch("/api/products?" + params.toString());
@@ -1366,23 +1376,23 @@
       const showRadarStrip = !appState.searchQuery && !appState.selectedCategory && !appState.filterOnlyDrops && (appState.liveDrops || []).length > 0;
       const radarStripHtml = showRadarStrip ? `
         <section class="p-4 sm:p-5 rounded-2xl bg-white border border-emerald-200/90 space-y-3">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div class="flex items-center gap-2.5">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
-              <h2 class="text-sm font-semibold text-slate-900">Canlı Gerçek İndirim Radarı</h2>
-              <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-semibold">30 Günlük Ortalamanın Altında</span>
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0"></span>
+              <h2 class="text-sm font-semibold text-slate-900 whitespace-nowrap">Gerçek İndirimler</h2>
+              <span class="hidden sm:inline px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-semibold">30 günlük ortalamanın altında</span>
             </div>
-            <button onclick="switchMainView('deals')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 self-start sm:self-auto">
-              Tüm Gerçek İndirimleri Gör (${appState.liveDrops.length}) →
+            <button onclick="switchMainView('deals')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 whitespace-nowrap">
+              Tümü (${appState.liveDrops.length}) →
             </button>
           </div>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory">
             ${(appState.liveDrops || []).slice(0, 4).map(d => {
               const st = getBrandStyle(d.platform, true);
               return `
                 <div
                   onclick="openProductXray('${d.product_key}')"
-                  class="cursor-pointer p-3 rounded-xl bg-slate-50/70 hover:bg-emerald-50/40 border border-slate-200/80 hover:border-emerald-300 transition flex flex-col justify-between gap-2"
+                  class="cursor-pointer w-64 shrink-0 sm:w-auto snap-start p-3 rounded-xl bg-slate-50/70 hover:bg-emerald-50/40 border border-slate-200/80 hover:border-emerald-300 transition flex flex-col justify-between gap-2"
                 >
                   <div class="flex items-start gap-2.5">
                     ${renderProductThumb(d.image_url, d.brand, d.category, "w-11 h-11")}
@@ -1524,14 +1534,15 @@
         <section class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 space-y-4">
           <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-3">
             <div>
-              <h1 class="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight">
-                Market ve Online Mağaza Fiyat Karşılaştırma
+              <h1 class="text-base sm:text-xl font-semibold text-slate-900 tracking-tight">
+                <span class="sm:hidden">Hangi markette daha ucuz?</span>
+                <span class="hidden sm:inline">Market ve Online Mağaza Fiyat Karşılaştırma</span>
               </h1>
-              <p class="text-xs sm:text-sm text-slate-500 mt-1">
+              <p class="hidden sm:block text-sm text-slate-500 mt-1">
                 Zincir marketler ve e-ticaret sitelerindeki güncel fiyatları kilogram, litre ve adet birim maliyetiyle karşılaştırın.
               </p>
             </div>
-            <div class="flex items-center gap-3 text-xs text-slate-500 shrink-0 num">
+            <div class="hidden sm:flex items-center gap-3 text-xs text-slate-500 shrink-0 num">
               <span><strong class="text-slate-900 font-semibold">${Number(s.catalog_total_products || s.total_products || sortedItems.length).toLocaleString("tr-TR")}</strong> ürün</span>
               <span class="text-slate-300">•</span>
               <span><strong class="text-slate-900 font-semibold">${Number(s.total_live_quotes || 0).toLocaleString("tr-TR")}</strong> mağaza fiyatı</span>
@@ -1553,8 +1564,8 @@
                 aria-label="Ürün, marka veya barkod ara"
                 oninput="handleSearchInput(this.value)"
                 onkeydown="if(event.key==='Enter'){event.preventDefault();triggerLiveProductSearch(this.value)}"
-                placeholder="Ürün, marka, model veya barkod arayın (örn: Çaykur, Persil, Dyson V15, Royal Canin, Solgar)..."
-                class="bg-transparent w-full text-sm outline-none text-slate-900 placeholder:text-slate-400"
+                placeholder="Ürün, marka veya barkod ara (örn: Çaykur, Persil)"
+                class="bg-transparent w-full text-base sm:text-sm outline-none text-slate-900 placeholder:text-slate-400"
               />
               ${appState.searchLoading ? `<span class="text-[11px] text-emerald-700 font-medium shrink-0">Taranıyor...</span>` : ""}
               ${appState.searchQuery ? `
@@ -1569,7 +1580,7 @@
               </button>
             </div>
 
-            <div class="flex items-center gap-2 shrink-0">
+            <div class="hidden sm:flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onclick="switchMainView('scanner')"
@@ -1597,8 +1608,21 @@
             ${catFilterHtml}
           </div>
 
+          <!-- Mobil: Filtreler düğmesi + sıralama -->
+          <div class="sm:hidden flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onclick="appState.filtersOpen = !appState.filtersOpen; renderCurrentView()"
+              class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium ${hasActiveFilters ? 'border-slate-900 text-slate-900' : 'border-slate-200 text-slate-700'} bg-white"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" d="M4 6h16M7 12h10M10 18h4"/></svg>
+              Filtreler${hasActiveFilters ? " •" : ""}
+            </button>
+            <span class="text-xs text-slate-400 num">${Number(pag.total_matching || sortedItems.length).toLocaleString("tr-TR")} sonuç</span>
+          </div>
+
           <!-- Kurumsal Detaylı Filtre & Sıralama Çubuğu -->
-          <div class="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2.5">
+          <div class="pt-2 border-t border-slate-100 ${appState.filtersOpen ? 'flex' : 'hidden'} sm:flex flex-wrap items-center justify-between gap-2.5">
             <div class="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -2999,16 +3023,16 @@
         <section class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 space-y-4">
           <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
-              <div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-semibold mb-1">
+              <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-semibold mb-1">
                 15 Dakikada Bir Canlı Tarama • Sahte İndirim ve Gramaj Korumalı
               </div>
-              <h1 class="text-lg sm:text-xl font-semibold text-slate-900">Gerçek İndirim Radarı ve Fırsat Akışı</h1>
+              <h1 class="text-base sm:text-xl font-semibold text-slate-900">Gerçek İndirimler</h1>
               <p class="text-xs sm:text-sm text-slate-500 mt-0.5">
                 30 günlük medyan ve rakip mağaza ortalamasının gerçekten altına inen ürünler otomatik tespit edilir.
               </p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
-              <a href="/api/dedektif/rss.xml" target="_blank" rel="noopener" class="px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700">
+              <a href="/api/dedektif/rss.xml" target="_blank" rel="noopener" class="hidden sm:inline-block px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-medium text-slate-700">
                 RSS Beslemesi ↗
               </a>
               <button onclick="openAlertModal()" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium">
@@ -3024,7 +3048,7 @@
                 subTab === 'radar' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:text-slate-900'
               }"
             >
-              Algoritmik Gerçek İndirimler (${drops.length})
+              Gerçek İndirimler (${drops.length})
             </button>
             <button
               onclick="appState.dealsSubTab='community';renderCurrentView()"
@@ -3845,7 +3869,7 @@
           <button
             type="button"
             onclick="selectCustomNeedCategory('${c.key}')"
-            class="px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
+            class="shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-xs font-medium border transition ${
               active
                 ? 'bg-slate-900 text-white border-slate-900'
                 : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200 hover:text-slate-900'
@@ -4252,11 +4276,11 @@
 
             <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
               <div>
-                <h1 class="text-lg sm:text-xl font-semibold text-slate-900 tracking-tight">
-                  Marka Seçimli Kendi Sepetim
+                <h1 class="text-base sm:text-xl font-semibold text-slate-900 tracking-tight">
+                  Kendi Sepetim
                 </h1>
                 <p class="text-xs sm:text-sm text-slate-500 mt-1">
-                  Tercih ettiğiniz markaları seçin; hem tek market toplamlarını hem de en düşük karma sepet dağılımını görün. Seçtiğiniz markanın bulunmadığı marketlerde eşdeğer muadil ürün açıkça belirtilir.
+                  Markaları seçin, hangi markette toplamın en düşük olduğunu görün. Marka yoksa muadili açıkça belirtilir.
                 </p>
               </div>
               <div class="flex items-center gap-3 shrink-0 text-xs">
@@ -4273,7 +4297,7 @@
 
             <!-- Kategori Sekmeleri ve Arama -->
             <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-1">
-              <div class="flex flex-wrap gap-1.5">
+              <div class="flex sm:flex-wrap gap-1.5 overflow-x-auto no-scrollbar">
                 ${catChipsHtml}
               </div>
               <div class="w-full md:w-72 shrink-0">
@@ -4446,7 +4470,7 @@
         }
 
         updateBasketHeaderBadge();
-        await refreshAuthStatus();
+        refreshAuthStatus();
         setInterval(pollBrowserAlertNotifications, 60000);
         setTimeout(pollBrowserAlertNotifications, 3000);
 

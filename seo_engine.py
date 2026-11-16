@@ -589,7 +589,7 @@ def build_corporate_identity_html() -> str:
   <meta name="description" content="dipci.tr kurumsal kimlik kılavuzu, 7 katmanlı bağımsız fiyat denetim metodolojisi, KVKK aydınlatma ilkeleri ve gelir ortaklığı şeffaflık beyanı." />
   <link rel="canonical" href="{CANONICAL_ORIGIN}/kurumsal" />
   <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/app.css" />
   <script type="application/ld+json">{org_ld}</script>
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased">
