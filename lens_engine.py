@@ -1130,21 +1130,48 @@ class DipciLensEngine:
         """
         if not query or len(query.strip()) < 2:
             return [], {}
+        # Yabancı aksanlı harfler (Nescafé) Akakçe aramasını ve kelime eşleşmesini bozuyor (16 Kas 2026)
+        query = query.translate(str.maketrans("éèêëáàâäíìîóòôúùû", "eeeeaaaaiiiooouuu"))
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
             "Accept-Language": "tr-TR,tr;q=0.9",
         }
         try:
-            search_url = f"https://www.akakce.com/arama/?q={urllib.parse.quote_plus(query)}"
+            # Akakçe "100 g" ile "100 gr"yi farklı arıyor; doğru ürün "gr" ile geliyor (16 Kas 2026, Nescafe Gold)
+            ak_query = re.sub(r"(\d)\s*g\b", r"\1 gr", query, flags=re.I)
+            search_url = f"https://www.akakce.com/arama/?q={urllib.parse.quote_plus(ak_query)}"
             req = urllib.request.Request(search_url, headers=headers)
             with urllib.request.urlopen(req, timeout=6.5) as resp:
                 html_txt = resp.read().decode("utf-8", errors="ignore")
         except Exception:
             return [], {}
 
-        cards = re.findall(r'<li[^>]+data-pr="(\d+)"[^>]*>(.*?)</li>', html_txt, re.S)
-        if not cards:
+        # Akakçe arama sonuçları (16 Kas 2026'dan beri) sayfa içi JSON'da (Astro props) geliyor; eski HTML kart yapısı yedek
+        candidates: List[Tuple[str, str]] = []
+        m_props = re.search(r'component-export="SearchWrapper"[^>]*props="([^"]+)"', html_txt)
+        if m_props:
+            try:
+                def _dv(x):
+                    if isinstance(x, list) and len(x) == 2 and isinstance(x[0], int):
+                        return [_dv(i) for i in x[1]] if x[0] == 1 else _dv(x[1])
+                    if isinstance(x, dict):
+                        return {k: _dv(v) for k, v in x.items()}
+                    return x
+                props = _dv(json.loads(html_lib.unescape(m_props.group(1))))
+                for pr in ((props.get("searchData") or {}).get("productList") or {}).get("products") or []:
+                    u = str(pr.get("url") or "")
+                    if u.startswith("/") and u.endswith(".html") and "," in u:
+                        candidates.append((str(pr.get("name") or ""), u))
+            except Exception:
+                candidates = []
+        if not candidates:
+            for _, inner in re.findall(r'<li[^>]+data-pr="(\d+)"[^>]*>(.*?)</li>', html_txt, re.S)[:20]:
+                t_m = re.search(r'<h3[^>]*class="pn_v8"[^>]*>(.*?)</h3>', inner, re.S) or re.search(r'title="([^"]+)"', inner)
+                h_m = re.search(r'href="(/[^"]+\.html)"', inner)
+                if t_m and h_m and "," in h_m.group(1):
+                    candidates.append((re.sub(r"<[^>]+>", "", t_m.group(1)), h_m.group(1)))
+        if not candidates:
             return [], {}
 
         q_tokens = [
@@ -1157,16 +1184,8 @@ class DipciLensEngine:
 
         best_href = ""
         best_score = -999.0
-        for _, inner in cards[:20]:
-            t_m = re.search(r'<h3[^>]*class="pn_v8"[^>]*>(.*?)</h3>', inner, re.S) or re.search(r'title="([^"]+)"', inner)
-            h_m = re.search(r'href="(/[^"]+\.html)"', inner)
-            if not t_m or not h_m:
-                continue
-            href = h_m.group(1)
-            # Kategori sayfası linklerini (virgülsüz) atla, sadece gerçek ürün sayfalarını al
-            if "," not in href:
-                continue
-            t_clean = html_lib.unescape(re.sub(r"<[^>]+>", "", t_m.group(1)).strip())
+        for raw_title, href in candidates[:24]:
+            t_clean = html_lib.unescape(raw_title.strip())
             t_norm = _norm_tr(t_clean)
             matched = sum(1 for tok in q_tokens if tok in t_norm)
             # Tek ortak kelime yetmez ("hava" → hava temizleyici): sorgu kelimelerinin en az %60'ı başlıkta geçmeli
@@ -1186,7 +1205,11 @@ class DipciLensEngine:
                     if 0.80 <= ratio <= 1.25:
                         sc += 25.0
                     elif ratio > 1.8 or ratio < 0.5:
-                        sc -= 20.0
+                        continue  # farklı paket boyu başka üründür (16 Kas: 100 g yerine 200 g geliyordu)
+            # Çoklu paket (4'lü, 12'li, x 4 adet) sorguda yoksa başka üründür
+            multi_re = r"\d+\s*['’]?\s*(?:li|lı|lu|lü)\b|\bx\s*\d+\s*adet"
+            if re.search(multi_re, t_clean, re.I) and not re.search(multi_re, query, re.I):
+                continue
             # Yedek parça / kılıf / aksesuar başlıklarını ana ürün aramasında geri plana at
             if any(bad in t_norm for bad in ("kilif", "ekran koruyucu", "yedek", "uyumlu", "aksesuar", "aparati")) and not any(
                 bad in _norm_tr(query) for bad in ("kilif", "yedek", "aksesuar")

@@ -1525,6 +1525,50 @@ class AutoCatalogEngine:
             "online_offers_persisted": offers_count,
         }
 
+    def enrich_online_offers(self, limit: int = 250, state_path: Optional[Path] = None) -> Dict:
+        """Katalogdaki market ürünlerine online mağaza (PTT AVM, n11, Hepsiburada, Amazon, Trendyol...) fiyatlarını ekler.
+        Kemal 16 Kas 2026: Nescafe Gold'da PTT AVM ve n11 marketlerden ucuzdu ama kartta görünmüyordu.
+        Her çalışmada sıradaki `limit` ürün taranır (dönüşümlü); Akakçe'yi yormamak için yavaş gider."""
+        t0 = time.time()
+        rows = self.db.conn.execute(
+            "SELECT product_key, brand, family_name FROM product_catalog_index ORDER BY offer_count DESC, product_key"
+        ).fetchall()
+        if not rows:
+            return {"ok": True, "enriched": 0}
+        state_path = state_path or (Path(__file__).resolve().parent / "data" / "online_enrich_offset.txt")
+        try:
+            start = int(state_path.read_text().strip() or 0) % len(rows)
+        except Exception:
+            start = 0
+        batch = [rows[(start + i) % len(rows)] for i in range(min(limit, len(rows)))]
+        enriched = 0
+        offers_added = 0
+        for r in batch:
+            q = f"{r['brand']} {r['family_name']}".strip()
+            try:
+                offers, _meta = self.lens._search_online_marketplaces_live(q, _extract_pack_info_from_text(q))
+            except Exception:
+                offers = []
+            if offers:
+                pk = self.persist_offers_for_product(
+                    raw_brand=r["brand"], raw_title=q, offers=offers,
+                    ping_search_engines=False, commit=False, update_index=False,
+                )
+                if pk:
+                    enriched += 1
+                    offers_added += len(offers)
+                    if enriched % 20 == 0:
+                        self.db.conn.commit()
+            time.sleep(1.2)
+        self.db.conn.commit()
+        try:
+            state_path.write_text(str((start + len(batch)) % len(rows)))
+        except Exception:
+            pass
+        indexed = self.db.rebuild_catalog_index()
+        return {"ok": True, "elapsed_sec": round(time.time() - t0, 1), "scanned": len(batch),
+                "enriched": enriched, "online_offers_added": offers_added, "indexed": indexed}
+
     def harvest_broad_catalog(self, include_online: bool = True, max_pages: int = 4) -> Dict:
         t0 = time.time()
         self.reclassify_existing_catalog()
@@ -1570,6 +1614,7 @@ def main() -> None:
     parser.add_argument("--rebuild-index", action="store_true", help="Yalnızca katalog arama/filtre indeksini yeniden oluştur")
     parser.add_argument("--import-bundles", type=str, default="", help="Önceden çekilmiş JSON paketlerini içe aktar")
     parser.add_argument("--discover", type=str, default="", help="Tekil ürün sorgusunu keşfet ve kaydet")
+    parser.add_argument("--enrich-online", type=int, default=0, help="Sıradaki N ürüne online mağaza fiyatı ekle")
     args = parser.parse_args()
 
     base_dir = Path(__file__).resolve().parent
@@ -1597,6 +1642,10 @@ def main() -> None:
         if not args.harvest and not args.supermarket_only:
             print(json.dumps({"ok": True, "imported_bundles": imported, "reclassified": recl, "indexed": cnt}, ensure_ascii=False))
             return
+
+    if args.enrich_online:
+        print(json.dumps(engine.enrich_online_offers(limit=args.enrich_online), ensure_ascii=False, indent=2))
+        return
 
     if args.discover:
         pkey = engine.discover_and_persist_query(args.discover)
