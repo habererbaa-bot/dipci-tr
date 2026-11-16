@@ -438,8 +438,12 @@ OCR_WORD_FIXES = {
 # ad.reklm.com takip linkine sarılır (url= derin bağlantı). Teklif no'ları yayıncı panelinden.
 REKLAMACTION_AFF_ID = os.getenv("REKLAMACTION_AFF_ID", "43815").strip()
 REKLAMACTION_OFFERS = {
-    "koctas.com.tr": "8937",   # Koçtaş [Satış] %2,20
-    "mi.com": "62394",         # Xiaomi [Satış / CPS] %2
+    # alan adı: (teklif no, derin linke eklenecek takip parametreleri — teklifin kendi varsayılan linkiyle AYNI olmalı;
+    #            None = derin link desteklenmiyor, ana sayfaya giden takip linki kullanılır)
+    "koctas.com.tr": ("8937", "utm_source=reklamaction&utm_medium=affiliate&utm_campaign={aff}&transaction_id={transaction_id}"),
+    "mi.com": ("62394", "utm_campaign=lo_tr&utm_channel=affiliate&utm_source=ReklamStore&utm_medium=paid-affiliate&utm_type=1&transaction_id={transaction_id}"),
+    "koton.com": ("5533", "utm_source=reklamstore&utm_medium=affiliate&utm_campaign={aff}&transaction_id={transaction_id}"),
+    "flo.com.tr": ("62376", None),  # FLO takibi Adjust üzerinden; derin link takibi düşürür
 }
 
 
@@ -457,15 +461,14 @@ def _apply_affiliate_url(url: str) -> str:
             host = urllib.parse.urlparse(url).netloc.lower().split(":")[0]
         except Exception:
             host = ""
-        for dom, offer_id in REKLAMACTION_OFFERS.items():
+        for dom, (offer_id, track_qs) in REKLAMACTION_OFFERS.items():
             if host == dom or host.endswith("." + dom):
+                base = f"https://ad.reklm.com/aff_c?offer_id={offer_id}&aff_id={REKLAMACTION_AFF_ID}"
+                if not track_qs:
+                    return base
                 # Derin linkte takip parametreleri kendiliğinden eklenmiyor; {transaction_id} makrosunu ağ dolduruyor
-                deep = url + ("&" if "?" in url else "?") + ("utm_source=reklamaction&utm_medium=affiliate"
-                    f"&utm_campaign={REKLAMACTION_AFF_ID}" + "&transaction_id={transaction_id}")
-                return (
-                    f"https://ad.reklm.com/aff_c?offer_id={offer_id}&aff_id={REKLAMACTION_AFF_ID}"
-                    f"&url={urllib.parse.quote(deep, safe='')}"
-                )
+                deep = url + ("&" if "?" in url else "?") + track_qs.replace("{aff}", REKLAMACTION_AFF_ID)
+                return f"{base}&url={urllib.parse.quote(deep, safe='')}"
     return url
 
 
