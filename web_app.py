@@ -553,6 +553,18 @@ def serve_lens_seo_page():
     )
 
 
+@app.get("/gizlilik", response_class=HTMLResponse)
+def serve_privacy_page():
+    from seo_engine import build_legal_page_html
+    return HTMLResponse(build_legal_page_html("gizlilik"), headers=NO_CACHE_HTML_HEADERS)
+
+
+@app.get("/kullanim-kosullari", response_class=HTMLResponse)
+def serve_terms_page():
+    from seo_engine import build_legal_page_html
+    return HTMLResponse(build_legal_page_html("kullanim-kosullari"), headers=NO_CACHE_HTML_HEADERS)
+
+
 @app.get("/kurumsal", response_class=HTMLResponse)
 def serve_corporate_page():
     page = build_corporate_identity_html().replace(

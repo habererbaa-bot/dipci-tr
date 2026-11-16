@@ -681,3 +681,79 @@ def build_corporate_identity_html() -> str:
   </footer>
 </body>
 </html>"""
+
+
+_LEGAL_PAGES = {
+    "gizlilik": (
+        "Gizlilik Politikası",
+        """
+<p>Bu sayfa dipci.tr'nin (Dipçi) hangi kişisel bilgileri neden topladığını ve nasıl koruduğunu anlatır. 6698 sayılı KVKK kapsamında veri sorumlusu dipci.tr'dir.</p>
+<h2>Topladığımız bilgiler</h2>
+<ul>
+<li><b>Google ile giriş:</b> Google hesabınızdaki adınız, e-posta adresiniz ve profil fotoğrafınız. Şifrenizi asla görmeyiz.</li>
+<li><b>E-posta ile giriş:</b> e-posta adresiniz ve size gönderilen tek kullanımlık doğrulama kodu.</li>
+<li><b>Fiyat alarmları ve listeler:</b> takip ettiğiniz ürünler, hedef fiyatlar ve alışveriş listeleriniz.</li>
+<li><b>Fotoğrafla ürün bulma:</b> yüklediğiniz fotoğraf yalnız ürünü tanımak için işlenir, profilinize bağlanmaz.</li>
+<li><b>Teknik kayıtlar:</b> güvenlik ve kötüye kullanımı önlemek için IP adresi ve tarayıcı bilgisi (5651 sayılı Kanun gereği).</li>
+</ul>
+<h2>Bilgileri ne için kullanırız</h2>
+<ul>
+<li>Hesabınızı açmak ve oturumunuzu korumak.</li>
+<li>İstediğiniz fiyat alarmlarını ve indirim bildirimlerini göndermek.</li>
+<li>Siteyi güvenli ve çalışır tutmak.</li>
+</ul>
+<p>Bilgilerinizi <b>satmayız</b>, reklam amacıyla üçüncü kişilerle paylaşmayız. Google hesap bilgileri yalnız giriş için kullanılır.</p>
+<h2>Bağlantılar ve gelir ortaklığı</h2>
+<p>Bazı mağaza bağlantıları gelir ortaklığı (komisyon) bağlantısıdır. Bu bağlantıya tıkladığınızda mağaza kendi gizlilik kurallarını uygular; size ek ücret yansımaz.</p>
+<h2>Çerezler</h2>
+<p>Oturumunuzu ve sepetinizi hatırlamak için tarayıcınızda küçük kayıtlar tutarız. Reklam takip çerezi kullanmayız.</p>
+<h2>Haklarınız</h2>
+<p>Bilgilerinize erişme, düzeltme ve silinmesini isteme hakkınız vardır. Hesabınızın ve bilgilerinizin silinmesi için <a href="mailto:iletisim@dipci.tr">iletisim@dipci.tr</a> adresine yazmanız yeterlidir; en geç 30 gün içinde yerine getirilir.</p>
+""",
+    ),
+    "kullanim-kosullari": (
+        "Kullanım Koşulları",
+        """
+<p>dipci.tr'yi kullanarak aşağıdaki koşulları kabul etmiş olursunuz.</p>
+<h2>Hizmet</h2>
+<p>dipci.tr market ve online mağaza fiyatlarını karşılaştıran ücretsiz bir hizmettir. Fiyatlar mağazalardan otomatik toplanır; mağazadaki güncel fiyat farklı olabilir. Satın almadan önce fiyatı mağazada kontrol edin.</p>
+<h2>Satış yapmayız</h2>
+<p>dipci.tr ürün satmaz. Satın alma, ödeme, teslimat ve iade işlemleri ilgili mağaza ile sizin aranızdadır.</p>
+<h2>Hesap ve paylaşımlar</h2>
+<p>Hesabınızın güvenliğinden siz sorumlusunuz. Yanıltıcı, hakaret içeren ya da yasa dışı paylaşımlar kaldırılır, hesap kapatılabilir.</p>
+<h2>Gelir ortaklığı</h2>
+<p>Bazı bağlantılar komisyon bağlantısıdır; bu, gösterilen fiyatları ve sıralamayı etkilemez.</p>
+<h2>İletişim</h2>
+<p><a href="mailto:iletisim@dipci.tr">iletisim@dipci.tr</a> — ayrıntılar için <a href="/gizlilik">Gizlilik Politikası</a>.</p>
+""",
+    ),
+}
+
+
+def build_legal_page_html(slug: str) -> str:
+    """Google girişi (OAuth onay ekranı) için gereken Gizlilik ve Kullanım Koşulları sayfaları (Kemal, 17 Kas 2026)."""
+    title, body = _LEGAL_PAGES[slug]
+    return f"""<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} | dipci.tr</title>
+  <link rel="canonical" href="{CANONICAL_ORIGIN}/{slug}" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg" />
+  <style>
+    body{{margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.65}}
+    header{{background:#fff;border-bottom:1px solid #e2e8f0}}
+    .w{{max-width:760px;margin:0 auto;padding:0 16px}}
+    header .w{{height:64px;display:flex;align-items:center}}
+    main{{background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:24px;margin:24px auto}}
+    h1{{font-size:26px;margin:0 0 12px}} h2{{font-size:18px;margin:24px 0 6px}}
+    a{{color:#047857}} li{{margin:4px 0}} footer{{color:#64748b;font-size:13px;padding:0 16px 32px}}
+  </style>
+</head>
+<body>
+  <header><div class="w"><a href="/"><img src="/static/brand/logo-light.svg" alt="dipci.tr" style="height:32px" /></a></div></header>
+  <div class="w"><main><h1>{title}</h1>{body}<p style="color:#64748b;font-size:13px;margin-top:24px">Son güncelleme: 17 Kasım 2026</p></main></div>
+  <footer class="w"><a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/kurumsal">Kurumsal</a></footer>
+</body>
+</html>"""
