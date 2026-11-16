@@ -618,12 +618,13 @@ class DipciLensEngine:
         b64 = base64.b64encode(raw_bytes).decode("ascii")
         prompt = (
             "Görseldeki ürünü tanı (market ürünü, gıda, temizlik, elektronik, kozmetik, mobilya, ev eşyası, giyim vb.). "
-            "Marka/model ancak görselde okunuyorsa ya da kesin tanınıyorsa yazılır; tahmin edilmez. "
+            "Marka/model ancak görselde okunuyorsa ya da kesin tanınıyorsa yazılır; tahmin edilmez. Kutuda ya da üründe model kodu (örn: ST-9632) yazıyorsa product_name içine mutlaka eklenir. "
             "Ürünün ne olduğundan emin değilsen product_name boş bırakılır. "
             "product_name, Türkiye'deki e-ticaret sitelerinde aranacak kısa Türkçe addır (varsa marka + ürün türü + belirgin özellik; örn: 'kolçaksız döner çalışma koltuğu'). "
             "SADECE geçerli JSON döndür:\n"
             '{"brand": "", "product_name": "", "pack_label": "Varsa gramaj/hacim/adet", '
             '"gtin": "Görünüyorsa barkod rakamları", "category_label": "Kısa kategori adı", '
+            '"generic_query": "Marka ve model kodu OLMADAN yalnız ürün türü, 2-4 kelime (örn: taşınabilir hava kompresörü)", '
             '"short_info": "Ürün hakkında 1 cümlelik Türkçe bilgi"}'
         )
         for model in ("gpt-6-luna", "gemini-3-8-flash"):
@@ -657,6 +658,7 @@ class DipciLensEngine:
                     "pack_label": str(parsed.get("pack_label") or "").strip(),
                     "gtin": "".join(c for c in str(parsed.get("gtin") or "") if c.isdigit()),
                     "category_label": str(parsed.get("category_label") or "").strip(),
+                    "generic_query": str(parsed.get("generic_query") or "").strip(),
                     "short_info": str(parsed.get("short_info") or "").strip(),
                     "mode": f"coarena_vision:{model}",
                 }
@@ -1150,9 +1152,12 @@ class DipciLensEngine:
             if len(t) >= 2 and not re.match(r"^(?:gr|kg|ml|lt|adet)$", t)
         ]
 
+        word_toks = [t for t in q_tokens if not re.search(r"\d", t)]
+        head_stem = word_toks[-1][:5] if word_toks and len(word_toks[-1]) >= 4 else ""
+
         best_href = ""
         best_score = -999.0
-        for _, inner in cards[:10]:
+        for _, inner in cards[:20]:
             t_m = re.search(r'<h3[^>]*class="pn_v8"[^>]*>(.*?)</h3>', inner, re.S) or re.search(r'title="([^"]+)"', inner)
             h_m = re.search(r'href="(/[^"]+\.html)"', inner)
             if not t_m or not h_m:
@@ -1164,9 +1169,16 @@ class DipciLensEngine:
             t_clean = html_lib.unescape(re.sub(r"<[^>]+>", "", t_m.group(1)).strip())
             t_norm = _norm_tr(t_clean)
             matched = sum(1 for tok in q_tokens if tok in t_norm)
-            if q_tokens and matched == 0:
+            # Tek ortak kelime yetmez ("hava" → hava temizleyici): sorgu kelimelerinin en az %60'ı başlıkta geçmeli
+            # (Kemal, 16 Kas 2026: ST-9632 hava kompresörü fotoğrafına hava temizleyici fiyatı geldi).
+            if q_tokens and matched < max(1, math.ceil(len(q_tokens) * 0.6)):
+                continue
+            # Türkçede ürünün ne olduğu son kelimededir ("çalışma koltuğu" → koltuk): o kelimenin kökü başlıkta yoksa ürün başkadır
+            if head_stem and head_stem not in t_norm:
                 continue
             sc = matched * 12.0
+            if any(re.search(r"\d", tok) and re.search(r"[a-z]", tok) and tok in t_norm for tok in q_tokens):
+                sc += 40.0  # model kodu eşleşmesi
             if target_pack:
                 c_pack = _extract_pack_info_from_text(t_clean)
                 if c_pack and c_pack[1] == target_pack[1]:
@@ -1386,8 +1398,11 @@ class DipciLensEngine:
 
         # İki kaynak da boş döndüyse ve sorgu çok uzunsa ilk 3 anahtar kelimeyle ikinci deneme yap
         if not mf_offers and not ec_offers:
-            short_words = [w for w in search_query.split() if len(w) >= 2][:3]
-            short_q = " ".join(short_words)
+            # Görüntü modeli markasız ürün türünü verdiyse onunla, yoksa ilk 3 kelimeyle ikinci deneme
+            short_q = (recog.get("generic_query") or "").strip()
+            if not short_q:
+                short_words = [w for w in search_query.split() if len(w) >= 2][:3]
+                short_q = " ".join(short_words)
             if short_q and short_q.lower() != full_search_query.lower():
                 with ThreadPoolExecutor(max_workers=2) as pool:
                     fut_mf = pool.submit(self._search_marketfiyati_live, short_q, target_pack, None)
