@@ -30,7 +30,7 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/opt/dipci
 EnvironmentFile=/opt/dipci/.env
-ExecStart=/opt/dipci/venv/bin/uvicorn web_app:app --host 127.0.0.1 --port 8090 --workers 2 --proxy-headers
+ExecStart=/opt/dipci/venv/bin/uvicorn web_app:app --host 127.0.0.1 --port 8090 --workers 2 --proxy-headers --no-server-header
 Restart=always
 RestartSec=3
 

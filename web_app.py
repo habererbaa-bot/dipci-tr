@@ -197,7 +197,20 @@ class HeadSupportMiddleware:
 
 app.add_middleware(HeadSupportMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+class CachedStaticFiles(StaticFiles):
+    """Statik dosyalar tarayıcıda önbelleğe alınır; ?v= sürümlü dosyalar 1 yıl (değişince URL değişir)."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            if b"v=" in scope.get("query_string", b""):
+                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            else:
+                response.headers["Cache-Control"] = "public, max-age=86400"
+        return response
+
+
+app.mount("/static", CachedStaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
 # ----------------- İstek Modelleri -----------------
@@ -344,8 +357,26 @@ NO_CACHE_HTML_HEADERS = {
 }
 
 
+_TEMPLATE_CACHE: dict = {"mtime": None, "html": ""}
+
+
+def _asset_version(rel_path: str) -> str:
+    try:
+        return str(int((STATIC_DIR / rel_path).stat().st_mtime))
+    except OSError:
+        return "0"
+
+
 def _read_index_template() -> str:
-    return (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    """index.html'i bellekte tutar; dosya değişince (deploy) otomatik yeniler.
+    CSS bağlantısına sürüm ekler ki tarayıcı önbelleği deploy sonrası eski stili göstermesin."""
+    path = STATIC_DIR / "index.html"
+    mtime = path.stat().st_mtime
+    if _TEMPLATE_CACHE["mtime"] != mtime:
+        html_src = path.read_text(encoding="utf-8")
+        html_src = html_src.replace('href="/static/app.css"', f'href="/static/app.css?v={_asset_version("app.css")}"')
+        _TEMPLATE_CACHE.update(mtime=mtime, html=html_src)
+    return _TEMPLATE_CACHE["html"]
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -524,7 +555,10 @@ def serve_lens_seo_page():
 
 @app.get("/kurumsal", response_class=HTMLResponse)
 def serve_corporate_page():
-    return HTMLResponse(build_corporate_identity_html(), headers=NO_CACHE_HTML_HEADERS)
+    page = build_corporate_identity_html().replace(
+        'href="/static/app.css"', f'href="/static/app.css?v={_asset_version("app.css")}"'
+    )
+    return HTMLResponse(page, headers=NO_CACHE_HTML_HEADERS)
 
 
 @app.get("/favicon.ico")
