@@ -1,0 +1,21 @@
+{
+  "name": "dipci.tr — Gerçek Dip Fiyat Radarı & Reyon Kamerası",
+  "short_name": "dipci.tr",
+  "description": "90 günlük fiyat hafızası, birim fiyat normalizasyonu, sahte indirim ve gramaj düşüşü (shrinkflation) radarı, reyon barkod kamerası ve doğrulanmış tüketici ağı.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0B132B",
+  "theme_color": "#0B132B",
+  "lang": "tr-TR",
+  "orientation": "portrait-primary",
+  "categories": ["shopping", "finance", "utilities"],
+  "icons": [
+    {
+      "src": "/static/brand/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

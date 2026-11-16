@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 184 44" fill="none">
+  <rect width="36" height="36" x="2" y="4" rx="9" fill="#0F172A"/>
+  <path d="M10.5 16 L18 22.5 L24.5 30.5 L31 23.5" stroke="#475569" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M10.5 16 L18 22.5 L24.5 30.5" stroke="#10B981" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24.5" cy="30.5" r="3.4" fill="#10B981"/>
+  <text x="48" y="29" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="23" font-weight="700" letter-spacing="-0.6" fill="#0F172A">dipci<tspan fill="#059669" font-weight="600">.tr</tspan></text>
+</svg>

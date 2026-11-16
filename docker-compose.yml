@@ -1,0 +1,11 @@
+services:
+  dipci-web:
+    build: .
+    container_name: dipci-tr-app
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ./data:/app/data

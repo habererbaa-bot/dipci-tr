@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <rect width="1200" height="630" fill="#0B132B"/>
+  <circle cx="1020" cy="140" r="260" fill="#10B981" fill-opacity="0.10"/>
+  <circle cx="160" cy="540" r="220" fill="#0EA5E9" fill-opacity="0.08"/>
+  <rect x="80" y="80" width="112" height="112" rx="30" fill="#1E293B" stroke="#334155" stroke-width="2"/>
+  <path d="M104 118 L128 136 L148 164 L170 144" stroke="#475569" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M104 116 L128 136 L148 164" stroke="#10B981" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="148" cy="164" r="11" fill="#10B981"/>
+  <circle cx="148" cy="164" r="4.5" fill="#FFFFFF"/>
+  <text x="216" y="156" font-family="Inter, Segoe UI, sans-serif" font-size="72" font-weight="900" fill="#FFFFFF">dipci</text>
+  <text x="386" y="156" font-family="Inter, Segoe UI, sans-serif" font-size="72" font-weight="800" fill="#10B981">.tr</text>
+  <text x="80" y="290" font-family="Inter, Segoe UI, sans-serif" font-size="54" font-weight="900" fill="#F8FAFC">Sahte İndirimi Değil,</text>
+  <text x="80" y="362" font-family="Inter, Segoe UI, sans-serif" font-size="54" font-weight="900" fill="#34D399">Gerçek Birim Dibi Yakala.</text>
+  <text x="80" y="438" font-family="Inter, Segoe UI, sans-serif" font-size="26" font-weight="500" fill="#94A3B8">90 Günlük Fiyat Hafızası • Reyon Barkod &amp; AI Görsel Kamerası • Doğrulanmış Alışveriş Ağı</text>
+  <rect x="80" y="492" width="380" height="58" rx="16" fill="#10B981"/>
+  <text x="270" y="529" text-anchor="middle" font-family="Inter, Segoe UI, sans-serif" font-size="24" font-weight="800" fill="#052E16">https://dipci.tr</text>
+</svg>
