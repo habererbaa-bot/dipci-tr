@@ -296,6 +296,7 @@ class PriceMemoryDB:
               AND captured_at >= ?
               AND captured_at <= ?
               AND seller_type IN ('OFFICIAL', 'AUTHORIZED')
+              AND seller_name NOT LIKE '%Referans%'
               {plat_filter}
             ORDER BY captured_at ASC
             """,
@@ -593,6 +594,7 @@ class PriceMemoryDB:
                   AND captured_at >= ?
                   AND captured_at <= ?
                   AND seller_type IN ('OFFICIAL', 'AUTHORIZED')
+                  AND seller_name NOT LIKE '%Referans%'
                 """,
                 keys_list + [t_30d, cutoff_hist],
             ).fetchall()
@@ -626,6 +628,7 @@ class PriceMemoryDB:
                 WHERE captured_at >= ?
                   AND captured_at <= ?
                   AND seller_type IN ('OFFICIAL', 'AUTHORIZED')
+                  AND seller_name NOT LIKE '%Referans%'
                 """,
                 (t_30d, cutoff_hist),
             ).fetchall()

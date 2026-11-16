@@ -28,6 +28,7 @@ from auto_catalog import AutoCatalogEngine, UNITLESS_ITEM_CATEGORIES
 from config import AFFILIATE_CONFIG
 from lens_engine import DipciLensEngine, _extract_pack_info_from_text
 from live_sync import MARKET_API_URL, MARKET_META, _norm_tr, extract_direct_url_from_image
+from variant_guard import is_same_variant
 from memory_db import PriceMemoryDB
 from price_alerts import PriceAlertService
 from seo_engine import CANONICAL_ORIGIN, CATEGORY_META, key_to_slug
@@ -196,11 +197,16 @@ class FastPriceRadar:
                 if overlap < max(1, min(2, len(fam_tokens))):
                     continue
 
+            # Farklı varyantı (yağ oranı, laktozsuz, aroma...) aynı ürün sayma
+            if not is_same_variant(f"{brand} {fam}", f"{raw_b} {raw_title}"):
+                continue
+
             p_info = _extract_pack_info_from_text(f"{ref_w} {raw_title}")
             if p_info and p_info[1] == base_unit and ref_amt > 0:
                 ratio = p_info[0] / ref_amt
                 if not (0.82 <= ratio <= 1.20):
                     continue
+            item_amt = p_info[0] if (p_info and p_info[1] == base_unit and p_info[0] > 0) else ref_amt
 
             for dep in depots:
                 raw_m = str(dep.get("marketAdi") or "").strip().lower()
@@ -224,9 +230,10 @@ class FastPriceRadar:
                     "title": raw_title,
                     "price": round(price, 2),
                     "url": final_url,
+                    "amount": item_amt,
                 }
                 prev = per_store.get(plat_key)
-                if prev is None or cand["price"] < prev["price"]:
+                if prev is None or cand["price"] / cand["amount"] < prev["price"] / prev["amount"]:
                     per_store[plat_key] = cand
 
         if not per_store:
@@ -235,7 +242,7 @@ class FastPriceRadar:
         now = datetime.now()
         today_prefix = now.strftime("%Y-%m-%d")
         for off in per_store.values():
-            u_price = round(off["price"] / max(ref_amt, 0.01), 2)
+            u_price = round(off["price"] / max(off["amount"], 0.01), 2)
             self.db.conn.execute(
                 """
                 DELETE FROM price_snapshots
@@ -262,7 +269,7 @@ class FastPriceRadar:
                     off["price"],
                     off["price"],
                     u_price,
-                    max(ref_amt, 0.01),
+                    max(off["amount"], 0.01),
                 ),
             )
         self.db.conn.commit()

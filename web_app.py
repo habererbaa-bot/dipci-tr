@@ -863,6 +863,7 @@ def get_product_xray(product_key: str, request: Request):
             SELECT substr(captured_at, 1, 10) AS day, MIN(effective_unit_price) AS unit_p
             FROM price_snapshots
             WHERE product_key = ? AND seller_type IN ('OFFICIAL', 'AUTHORIZED')
+              AND seller_name NOT LIKE '%Referans%'
               AND captured_at >= date('now', '-90 days')
             GROUP BY substr(captured_at, 1, 10)
             ORDER BY day DESC

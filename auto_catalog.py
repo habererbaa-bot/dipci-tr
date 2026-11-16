@@ -50,6 +50,7 @@ from live_sync import (
     ping_indexnow,
 )
 from memory_db import PriceMemoryDB
+from variant_guard import is_same_variant
 from scanner import compute_ean13_with_check
 from seo_engine import CANONICAL_ORIGIN, key_to_slug
 
@@ -745,7 +746,7 @@ class AutoCatalogEngine:
                 if not r_tokens:
                     continue
                 overlap = len(fam_tokens & r_tokens)
-                if overlap >= max(2, min(len(fam_tokens), len(r_tokens))):
+                if overlap >= max(2, min(len(fam_tokens), len(r_tokens))) and is_same_variant(family_name, r["family_name"]):
                     ref_a = float(r["reference_net_amount"] or 1.0)
                     if r["base_unit"] == base_unit and ref_a > 0 and net_amount > 0:
                         ratio = net_amount / ref_a
@@ -796,7 +797,12 @@ class AutoCatalogEngine:
         commit: bool = True,
         update_index: bool = True,
     ) -> Optional[str]:
-        valid_offers = [o for o in (offers or []) if float(o.get("price") or 0) > 1.0]
+        valid_offers = [
+            o for o in (offers or [])
+            if float(o.get("price") or 0) > 1.0
+            # Başlığı farklı varyant olan mağaza teklifini (ör. laktozsuz, %0,5 yağlı, zero) bu ürüne yazma
+            and is_same_variant(raw_title, str(o.get("title") or raw_title))
+        ]
         if not valid_offers:
             return None
 
@@ -840,7 +846,6 @@ class AutoCatalogEngine:
                 commit=False,
             )
 
-            unit_values: List[float] = []
             for off in valid_offers:
                 price = round(float(off["price"]), 2)
                 off_pack = _extract_pack_info_from_text(str(off.get("title") or ""))
@@ -852,7 +857,6 @@ class AutoCatalogEngine:
                     item_amt = max(net_amount, 0.01)
 
                 u_price = round(price / max(item_amt, 0.01), 2)
-                unit_values.append(u_price)
 
                 plat = str(off.get("platform") or "default").strip().lower()
                 seller = str(off.get("seller_name") or plat.upper()).strip()
@@ -891,33 +895,8 @@ class AutoCatalogEngine:
                     ),
                 )
 
-            # İlk kez eklenen çok mağazalı ürün için 90g grafik baz referansı oluştur
-            if is_new and len(unit_values) >= 2:
-                med_u = round(statistics.median(unit_values), 2)
-                med_p = round(med_u * max(net_amount, 0.01), 2)
-                lead_url = _apply_affiliate_url(str(valid_offers[0].get("url") or ""))
-                for days_back in (35, 18, 7):
-                    self.db.conn.execute(
-                        """
-                        INSERT INTO price_snapshots
-                        (product_key, platform, seller_name, seller_type, seller_rating, title, url,
-                         captured_at, list_price, sale_price, effective_pack_price, effective_unit_price,
-                         net_amount, pack_tier, warranty_type, zero_interest_months, energy_class, model_code_seen)
-                        VALUES (?, ?, 'Piyasa Medyan Referansı', 'OFFICIAL', 9.5, ?, ?, ?, NULL, ?, ?, ?, ?, 'SINGLE', 'TR_OFFICIAL', 0, '', '')
-                        """,
-                        (
-                            pkey,
-                            str(valid_offers[0].get("platform") or "migros"),
-                            f"{brand} {family_name}",
-                            lead_url,
-                            (now - timedelta(days=days_back)).isoformat(),
-                            med_p,
-                            med_p,
-                            med_u,
-                            max(net_amount, 0.01),
-                        ),
-                    )
-
+            # Not: Eskiden ilk kez eklenen ürüne geriye tarihli "Piyasa Medyan Referansı" kayıtları
+            # yazılıyordu (sahte geçmiş). Kaldırıldı; geçmiş yalnızca gerçek gözlemlerden oluşur.
             if commit:
                 self.db.conn.commit()
             if update_index:

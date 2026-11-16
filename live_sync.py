@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Tuple
 
 from collectors import MultiSourceCollector
 from memory_db import PriceMemoryDB
+from variant_guard import is_same_variant, purge_synthetic_reference_history, purge_variant_mismatches
 from price_alerts import PriceAlertService
 from scanner import compute_ean13_with_check
 from seo_engine import CANONICAL_ORIGIN, INDEXNOW_KEY, key_to_slug
@@ -516,7 +517,9 @@ def sync_live_supermarkets(db: PriceMemoryDB) -> Tuple[int, List[str]]:
     today_prefix = now.strftime("%Y-%m-%d")
 
     fix_legacy_seed_urls(db)
-    snapshots_written += sync_curated_tech(db, now)
+    # Not: sync_curated_tech, koda sabit yazılmış teknoloji fiyatlarını her çalıştırmada "bugünün fiyatı"
+    # olarak yeniden kaydediyordu (bayat fiyat canlı gibi görünüyordu). Devre dışı; bu ürünler online
+    # pazaryeri taramasıyla (harvest_online_marketplaces) gerçek fiyat aldıkça güncellenir.
 
     existing_keys = {
         r["product_key"]
@@ -563,6 +566,8 @@ def sync_live_supermarkets(db: PriceMemoryDB) -> Tuple[int, List[str]]:
             if not _title_matches_must_tokens(t_norm, must_tokens):
                 continue
             if any(ex in t_norm for ex in exclude_tokens):
+                continue
+            if not is_same_variant(f"{brand} {fam}", title):
                 continue
 
             img_candidate = str(item.get("imageUrl") or "").strip()
@@ -635,25 +640,8 @@ def sync_live_supermarkets(db: PriceMemoryDB) -> Tuple[int, List[str]]:
         if not best_per_market:
             continue
 
-        hist = db.get_historical_stats(pkey, now=now)
-        if hist.sample_count == 0 and len(best_per_market) >= 2:
-            med_unit = round(statistics.median([v["unit_val"] for v in best_per_market.values()]), 2)
-            med_pack = round(med_unit * ref_amt, 2)
-            for days_back in (35, 18, 7):
-                db.record_snapshot(
-                    product_key=pkey,
-                    platform="migros",
-                    seller_name="Piyasa Medyan Referansı",
-                    title=f"{brand} {fam}",
-                    url=mig_direct_url or f"https://www.migros.com.tr/arama?q={urllib.parse.quote_plus(query)}",
-                    sale_price=med_pack,
-                    effective_pack_price=med_pack,
-                    effective_unit_price=med_unit,
-                    net_amount=ref_amt,
-                    captured_at=now - timedelta(days=days_back),
-                    seller_type="OFFICIAL",
-                    seller_rating=9.5,
-                )
+        # Not: Eskiden geçmişi olmayan ürünler için geriye tarihli "Piyasa Medyan Referansı" kayıtları
+        # uyduruluyordu; bu, sahte "gerçek indirim" sonuçları üretiyordu. Artık yalnızca gerçek gözlemler tutulur.
 
         for raw_m, offer in best_per_market.items():
             plat_key, seller_label, search_prefix = MARKET_META.get(
@@ -767,6 +755,10 @@ def run_sync() -> None:
     slice_len = max(1, (len(ONLINE_MARKETPLACE_SEEDS) + 3) // 4)
     ec_slice = ONLINE_MARKETPLACE_SEEDS[slot * slice_len : (slot + 1) * slice_len]
     ec_harvest = auto_engine.harvest_online_marketplaces(seeds=ec_slice)
+
+    # Yanlış eşleşmiş varyant fiyatlarını ve eski uydurma referans geçmişini temizle
+    purge_synthetic_reference_history(db.conn)
+    purge_variant_mismatches(db.conn)
 
     indexed_cnt = db.rebuild_catalog_index()
     alert_svc = PriceAlertService(db)
