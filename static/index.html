@@ -919,10 +919,9 @@
     }
 
     async function pollBrowserAlertNotifications() {
-      const savedEmail = (localStorage.getItem("dipci_alert_email") || "").trim();
-      if (!savedEmail && !appState.member) return;
+      if (!appState.member) return;
       try {
-        const { data } = await apiFetch("/api/alerts/notifications?email=" + encodeURIComponent(savedEmail));
+        const { data } = await apiFetch("/api/alerts/notifications");
         const items = (data && (data.notifications || data.triggered)) || [];
         items.forEach(n => {
           const pTitle = n.title || ((n.brand || "") + " " + (n.family_name || "")).trim();
@@ -2217,11 +2216,13 @@
       const email = (document.getElementById("alertEmailInput").value || localStorage.getItem("dipci_alert_email") || "").trim();
       const container = document.getElementById("alertListContainer");
       if (!container) return;
-      if (!email && !appState.member) {
-        container.innerHTML = '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Alarmlarınızı görmek için e-posta adresinizi girin veya giriş yapın.</div>';
+      if (!appState.member) {
+        container.innerHTML = email
+          ? '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Alarmınız kuruldu; fiyat düştüğünde e-posta ile haber vereceğiz. Alarmlarınızı görmek ve yönetmek için aynı e-posta adresiyle giriş yapın.</div>'
+          : '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Alarmlarınızı görmek ve yönetmek için giriş yapın.</div>';
         return;
       }
-      const { data } = await apiFetch("/api/alerts?email=" + encodeURIComponent(email));
+      const { data } = await apiFetch("/api/alerts");
       const list = (data && data.alerts) || [];
       if (list.length === 0) {
         container.innerHTML = '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Kayıtlı fiyat alarmınız bulunmuyor.</div>';
@@ -2255,8 +2256,7 @@
     }
 
     async function deleteUserAlert(alertId) {
-      const email = (document.getElementById("alertEmailInput").value || localStorage.getItem("dipci_alert_email") || "").trim();
-      await apiFetch("/api/alerts/" + alertId + "?email=" + encodeURIComponent(email), { method: "DELETE" });
+      await apiFetch("/api/alerts/" + alertId, { method: "DELETE" });
       await loadUserAlerts();
     }
 

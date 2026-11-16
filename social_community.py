@@ -18,6 +18,7 @@ dipci.tr & Market Dedektifi — Doğrulanmış Sosyal Topluluk, Fırsat Akışı
 """
 
 import hashlib
+import hmac
 import json
 import os
 import random
@@ -180,7 +181,86 @@ class SocialCommunityService:
             );
             """
         )
+        otp_cols = {r[1] for r in self.conn.execute("PRAGMA table_info(pending_otp_codes)").fetchall()}
+        if "attempts" not in otp_cols:
+            self.conn.execute("ALTER TABLE pending_otp_codes ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
+        if "created_at" not in otp_cols:
+            self.conn.execute("ALTER TABLE pending_otp_codes ADD COLUMN created_at TEXT")
         self.conn.commit()
+
+    # ----------------- Doğrulama kodu (OTP) güvenlik yardımcıları -----------------
+
+    OTP_MAX_ATTEMPTS = 5
+    OTP_RESEND_COOLDOWN_SECONDS = 60
+
+    @staticmethod
+    def _demo_auth_allowed() -> bool:
+        """Kodun API yanıtında dönmesine yalnızca açıkça DIPCI_DEMO_AUTH=1 ile izin verilir (canlıda asla)."""
+        return os.getenv("DIPCI_DEMO_AUTH", "0").strip() == "1"
+
+    def _store_pending_otp(self, identity_hash: str, safe_name: str, skip_cooldown: bool = False) -> Tuple[bool, str]:
+        """Yeni kod üretir ve saklar. (ok, kod_veya_hata) döndürür."""
+        if not skip_cooldown:
+            recent = self.conn.execute(
+                """
+                SELECT 1 FROM pending_otp_codes
+                WHERE phone_hash = ? AND created_at IS NOT NULL
+                  AND created_at > datetime('now', ?)
+                """,
+                (identity_hash, f"-{self.OTP_RESEND_COOLDOWN_SECONDS} seconds"),
+            ).fetchone()
+            if recent:
+                return False, "Yeni kod istemeden önce lütfen 1 dakika bekleyin."
+        otp = f"{secrets.randbelow(900000) + 100000}"
+        self.conn.execute(
+            """
+            INSERT OR REPLACE INTO pending_otp_codes
+                (phone_hash, display_name, otp_code, expires_at, attempts, created_at)
+            VALUES (?, ?, ?, datetime('now', '+10 minutes'), 0, datetime('now'))
+            """,
+            (identity_hash, safe_name, otp),
+        )
+        self.conn.commit()
+        return True, otp
+
+    def _consume_pending_otp(self, identity_hash: str, otp_code: str) -> Tuple[Optional[sqlite3.Row], str]:
+        """Kodu süre ve deneme sınırıyla doğrular. Başarılıysa (satır, ""), değilse (None, hata) döner."""
+        generic_err = "Doğrulama kodu hatalı veya süresi dolmuş."
+        row = self.conn.execute(
+            """
+            SELECT *, (expires_at > datetime('now')) AS is_fresh
+            FROM pending_otp_codes WHERE phone_hash = ?
+            """,
+            (identity_hash,),
+        ).fetchone()
+        if not row:
+            return None, generic_err
+        if not row["is_fresh"]:
+            self.conn.execute("DELETE FROM pending_otp_codes WHERE phone_hash = ?", (identity_hash,))
+            self.conn.commit()
+            return None, generic_err
+        if int(row["attempts"] or 0) >= self.OTP_MAX_ATTEMPTS:
+            self.conn.execute("DELETE FROM pending_otp_codes WHERE phone_hash = ?", (identity_hash,))
+            self.conn.commit()
+            return None, "Çok fazla hatalı deneme yapıldı; lütfen yeni bir kod isteyin."
+        if not hmac.compare_digest(str(row["otp_code"]), (otp_code or "").strip()):
+            self.conn.execute(
+                "UPDATE pending_otp_codes SET attempts = attempts + 1 WHERE phone_hash = ?",
+                (identity_hash,),
+            )
+            self.conn.commit()
+            return None, generic_err
+        return row, ""
+
+    def _link_email_alerts_to_member(self, clean_email: str, member_id: int) -> None:
+        """E-postası doğrulanan üyenin daha önce oturumsuz kurduğu alarmları hesabına bağlar."""
+        try:
+            self.conn.execute(
+                "UPDATE price_alerts SET member_id = ? WHERE email = ? AND member_id IS NULL",
+                (member_id, clean_email),
+            )
+        except sqlite3.OperationalError:
+            pass  # price_alerts tablosu henüz yoksa sorun değil
 
     @classmethod
     def _normalize_ten_digit_phone(cls, raw_phone: str) -> Tuple[bool, str]:
@@ -219,18 +299,16 @@ class SocialCommunityService:
         _, p_hash = self._hash_phone(ten_digits)
 
         safe_name = self._privacy_safe_name(display_name)
-        otp = f"{random.randint(100000, 999999)}"
-        self.conn.execute(
-            """
-            INSERT OR REPLACE INTO pending_otp_codes (phone_hash, display_name, otp_code, expires_at)
-            VALUES (?, ?, ?, datetime('now', '+10 minutes'))
-            """,
-            (p_hash, safe_name, otp),
-        )
-        self.conn.commit()
-
         netgsm = NetgsmClient()
-        if netgsm.is_configured and not force_demo:
+        live_sms = netgsm.is_configured and not force_demo
+        if not live_sms and not (force_demo or self._demo_auth_allowed()):
+            return {"ok": False, "error": "SMS doğrulama şu anda kullanılamıyor; lütfen e-posta ile giriş yapın."}
+
+        stored, otp = self._store_pending_otp(p_hash, safe_name, skip_cooldown=force_demo)
+        if not stored:
+            return {"ok": False, "error": otp}
+
+        if live_sms:
             sent, detail = netgsm.send_otp(ten_digits, otp)
             if not sent:
                 return {"ok": False, "error": f"SMS gönderilemedi: {detail}"}
@@ -254,12 +332,9 @@ class SocialCommunityService:
         if not ok:
             return {"ok": False, "error": "Geçersiz telefon numarası."}
 
-        row = self.conn.execute(
-            "SELECT * FROM pending_otp_codes WHERE phone_hash = ? AND otp_code = ?",
-            (p_hash, (otp_code or "").strip()),
-        ).fetchone()
+        row, otp_err = self._consume_pending_otp(p_hash, otp_code)
         if not row:
-            return {"ok": False, "error": "Doğrulama kodu hatalı veya süresi dolmuş."}
+            return {"ok": False, "error": otp_err}
 
         token = secrets.token_hex(20)
         existing = self.conn.execute(
@@ -313,18 +388,16 @@ class SocialCommunityService:
             return {"ok": False, "error": cleaned_email}
 
         safe_name = self._privacy_safe_name(display_name or cleaned_email.split("@", 1)[0])
-        otp = f"{random.randint(100000, 999999)}"
-        self.conn.execute(
-            """
-            INSERT OR REPLACE INTO pending_otp_codes (phone_hash, display_name, otp_code, expires_at)
-            VALUES (?, ?, ?, datetime('now', '+10 minutes'))
-            """,
-            (e_hash, safe_name, otp),
-        )
-        self.conn.commit()
-
         mailer = EmailOTPClient()
-        if mailer.is_configured and not force_demo:
+        live_email = mailer.is_configured and not force_demo
+        if not live_email and not (force_demo or self._demo_auth_allowed()):
+            return {"ok": False, "error": "E-posta doğrulama şu anda kullanılamıyor; lütfen daha sonra tekrar deneyin."}
+
+        stored, otp = self._store_pending_otp(e_hash, safe_name, skip_cooldown=force_demo)
+        if not stored:
+            return {"ok": False, "error": otp}
+
+        if live_email:
             sent, detail = mailer.send_otp_email(cleaned_email, safe_name, otp)
             if not sent:
                 return {"ok": False, "error": f"E-posta gönderilemedi: {detail}"}
@@ -348,12 +421,9 @@ class SocialCommunityService:
         if not ok:
             return {"ok": False, "error": err}
 
-        row = self.conn.execute(
-            "SELECT * FROM pending_otp_codes WHERE phone_hash = ? AND otp_code = ?",
-            (e_hash, (otp_code or "").strip()),
-        ).fetchone()
+        row, otp_err = self._consume_pending_otp(e_hash, otp_code)
         if not row:
-            return {"ok": False, "error": "Doğrulama kodu hatalı veya süresi dolmuş."}
+            return {"ok": False, "error": otp_err}
 
         token = secrets.token_hex(20)
         existing = self.conn.execute(
@@ -381,6 +451,7 @@ class SocialCommunityService:
             member_id = cur.lastrowid
 
         self.conn.execute("DELETE FROM pending_otp_codes WHERE phone_hash = ?", (e_hash,))
+        self._link_email_alerts_to_member(err, int(member_id))  # err = temizlenmiş e-posta adresi
         self.conn.commit()
         return {
             "ok": True,
@@ -390,6 +461,8 @@ class SocialCommunityService:
 
     def login_with_google_token(self, id_token: str) -> Dict:
         client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
+        if not client_id:
+            return {"ok": False, "error": "Google ile giriş şu anda etkin değil."}
         ok, info, err = verify_google_id_token(id_token, expected_client_id=client_id)
         if not ok:
             return {"ok": False, "error": err}
@@ -429,6 +502,7 @@ class SocialCommunityService:
             member_id = cur.lastrowid
             disp = safe_name
 
+        self._link_email_alerts_to_member(email, int(member_id))
         self.conn.commit()
         return {
             "ok": True,
