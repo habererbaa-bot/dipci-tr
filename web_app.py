@@ -3,14 +3,21 @@ dipci.tr — Yeni Nesil Fiyat, Birim Maliyet, Kamera Okuyucu ve Doğrulanmış S
 Tam Kapsamlı Web Sunucusu (FastAPI + SQLite WAL + 7 Katmanlı Market Dedektifi Denetim Motoru)
 """
 
+import ipaddress
 import json
 import os
+import socket
+import threading
+import time
+from collections import defaultdict, deque
 from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from urllib.parse import urlparse
+
+from fastapi import FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -85,10 +92,87 @@ if _idx_count < _prod_count:
     fast_radar.sync_watchlist()
     fast_radar.detect_and_publish_drops()
 
+_DOCS_ENABLED = os.getenv("DIPCI_ENABLE_DOCS", "0").strip() == "1"
+
 app = FastAPI(
     title="dipci.tr — Fiyat Röntgeni, Reyon Kamerası & Doğrulanmış Alışveriş Ağı",
     version="1.0.0",
+    docs_url="/docs" if _DOCS_ENABLED else None,
+    redoc_url="/redoc" if _DOCS_ENABLED else None,
+    openapi_url="/openapi.json" if _DOCS_ENABLED else None,
 )
+
+
+# ----------------- Basit IP Bazlı Hız Sınırlayıcı -----------------
+# Not: Her uvicorn işçisi kendi sayacını tutar (--workers 2 => etkin sınır en fazla 2 katı).
+# Daha katı sınır gerekirse Caddy rate_limit modülü veya Redis tabanlı sayaç kullanılabilir.
+
+class _SlidingWindowLimiter:
+    def __init__(self) -> None:
+        self._hits: dict = defaultdict(deque)
+        self._lock = threading.Lock()
+
+    def allow(self, key: str, limit: int, window_seconds: int) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            q = self._hits[key]
+            while q and now - q[0] > window_seconds:
+                q.popleft()
+            if len(q) >= limit:
+                return False
+            q.append(now)
+            if len(self._hits) > 50_000:  # bellek koruması
+                for k in [k for k, v in self._hits.items() if not v][:10_000]:
+                    self._hits.pop(k, None)
+            return True
+
+
+_limiter = _SlidingWindowLimiter()
+
+
+def _client_ip(request: Request) -> str:
+    # uvicorn --proxy-headers, Caddy'den (127.0.0.1) gelen X-Forwarded-For'u request.client'a yansıtır
+    return (request.client.host if request.client else "") or "unknown"
+
+
+def _enforce_rate_limit(request: Request, bucket: str, limit: int, window_seconds: int) -> None:
+    if not _limiter.allow(f"{bucket}:{_client_ip(request)}", limit, window_seconds):
+        raise HTTPException(status_code=429, detail="Çok fazla istek gönderdiniz; lütfen biraz sonra tekrar deneyin.")
+
+
+def _discovery_allowed(request: Request) -> bool:
+    """Katalogda olmayan ürün için dış mağazalarda canlı tarama + kalıcı sayfa açmaya izin var mı?"""
+    return _limiter.allow(f"discover:{_client_ip(request)}", 6, 60) and _limiter.allow("discover:global", 120, 60)
+
+
+class SecurityHeadersMiddleware:
+    """Temel güvenlik başlıkları (CSP, Tailwind CDN derlenmiş CSS'e taşınınca eklenmeli)."""
+
+    HEADERS = [
+        (b"strict-transport-security", b"max-age=31536000; includeSubDomains"),
+        (b"x-content-type-options", b"nosniff"),
+        (b"x-frame-options", b"SAMEORIGIN"),
+        (b"referrer-policy", b"strict-origin-when-cross-origin"),
+        (b"permissions-policy", b"camera=(self), microphone=(), geolocation=()"),
+    ]
+
+    def __init__(self, asgi_app):
+        self.asgi_app = asgi_app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.asgi_app(scope, receive, send)
+            return
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"server"]
+                existing = {k.lower() for k, _ in headers}
+                headers.extend((k, v) for k, v in self.HEADERS if k not in existing)
+                message = dict(message, headers=headers)
+            await send(message)
+
+        await self.asgi_app(scope, receive, send_with_headers)
 
 
 class HeadSupportMiddleware:
@@ -112,6 +196,7 @@ class HeadSupportMiddleware:
 
 
 app.add_middleware(HeadSupportMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
@@ -290,12 +375,12 @@ def serve_spa_index(q: str = ""):
 
 
 @app.get("/urun/{slug}", response_class=HTMLResponse)
-def serve_product_seo_page(slug: str):
+def serve_product_seo_page(slug: str, request: Request):
     product_key = slug_to_key(slug)
     bundle = build_product_seo_bundle(db, audit_engine, social_service, product_key)
     if not bundle:
         human_query = slug.replace("-", " ").replace("_", " ").strip()
-        if len(human_query) >= 3:
+        if 3 <= len(human_query) <= 120 and _discovery_allowed(request):
             discovered_key = auto_catalog.discover_and_persist_query(query=human_query)
             if discovered_key:
                 product_key = discovered_key
@@ -319,12 +404,12 @@ def serve_product_seo_page(slug: str):
 
 
 @app.get("/barkod/{gtin}", response_class=HTMLResponse)
-def serve_barcode_seo_page(gtin: str):
+def serve_barcode_seo_page(gtin: str, request: Request):
     matched = db.lookup_by_barcode(gtin)
     target_key = matched["product_key"] if matched else ""
     target_gtin = matched["gtin"] if matched else "".join(ch for ch in gtin if ch.isdigit())
 
-    if not target_key and len(target_gtin) >= 8:
+    if not target_key and 8 <= len(target_gtin) <= 14 and _discovery_allowed(request):
         discovered_key = auto_catalog.discover_and_persist_query(detected_gtin=target_gtin)
         if discovered_key:
             target_key = discovered_key
@@ -518,6 +603,7 @@ def _norm_search_tr(text: str) -> str:
 
 @app.get("/api/products")
 def list_products(
+    request: Request,
     q: str = "",
     category: str = "",
     brand: str = "",
@@ -578,7 +664,12 @@ def list_products(
     ).fetchone()["c"]
 
     # Katalogda henüz olmayan bir ürün arandıysa canlı mağazalardan keşfet ve kalıcı sayfa aç
-    if q_raw and len(q_raw) >= 3 and ((total_matching == 0 and not brand_clean and not store_clean) or live == 1):
+    if (
+        q_raw
+        and 3 <= len(q_raw) <= 120
+        and ((total_matching == 0 and not brand_clean and not store_clean) or live == 1)
+        and _discovery_allowed(request)
+    ):
         gtin_arg = q_raw if q_raw.isdigit() and len(q_raw) >= 8 else ""
         new_pkey = auto_catalog.discover_and_persist_query(query=q_raw, detected_gtin=gtin_arg)
         if new_pkey:
@@ -711,11 +802,11 @@ def list_products(
 
 
 @app.get("/api/products/{product_key}")
-def get_product_xray(product_key: str):
+def get_product_xray(product_key: str, request: Request):
     prod = db.conn.execute(
         "SELECT * FROM canonical_products WHERE product_key = ?", (product_key,)
     ).fetchone()
-    if not prod:
+    if not prod and len(product_key) <= 120 and _discovery_allowed(request):
         discovered = auto_catalog.discover_and_persist_query(query=product_key.replace("_", " "))
         if discovered:
             product_key = discovered
@@ -734,12 +825,16 @@ def get_product_xray(product_key: str):
     # 90 Günlük Tarihsel Noktalar (Grafik için)
     hist_rows = db.conn.execute(
         """
-        SELECT substr(captured_at, 1, 10) AS day, MIN(effective_unit_price) AS unit_p
-        FROM price_snapshots
-        WHERE product_key = ? AND seller_type IN ('OFFICIAL', 'AUTHORIZED')
-        GROUP BY substr(captured_at, 1, 10)
+        SELECT day, unit_p FROM (
+            SELECT substr(captured_at, 1, 10) AS day, MIN(effective_unit_price) AS unit_p
+            FROM price_snapshots
+            WHERE product_key = ? AND seller_type IN ('OFFICIAL', 'AUTHORIZED')
+              AND captured_at >= date('now', '-90 days')
+            GROUP BY substr(captured_at, 1, 10)
+            ORDER BY day DESC
+            LIMIT 15
+        )
         ORDER BY day ASC
-        LIMIT 15
         """,
         (product_key,),
     ).fetchall()
@@ -870,8 +965,10 @@ def api_scan_vision(
 @app.post("/api/scan/photo")
 def api_scan_photo(
     payload: PhotoScanPayload,
+    request: Request,
     x_session_token: Optional[str] = Header(default=None),
 ):
+    _enforce_rate_limit(request, "vision", 10, 60)
     parsed = analyze_shelf_photo_base64(
         image_base64=payload.image_base64,
         mime_type=payload.mime_type,
@@ -924,8 +1021,10 @@ def api_scan_photo(
 @app.post("/api/scan/lens")
 def api_scan_lens(
     payload: LensScanPayload,
+    request: Request,
     x_session_token: Optional[str] = Header(default=None),
 ):
+    _enforce_rate_limit(request, "vision", 10, 60)
     result = lens_engine.analyze_and_compare(
         image_base64=payload.image_base64,
         mime_type=payload.mime_type,
@@ -949,6 +1048,7 @@ def api_scan_lens(
 
 @app.post("/api/scan/lens-upload")
 async def api_scan_lens_upload(
+    request: Request,
     image: Optional[UploadFile] = File(default=None),
     detected_gtin: str = Form(default=""),
     query_override: str = Form(default=""),
@@ -958,6 +1058,7 @@ async def api_scan_lens_upload(
     Mobil tarayıcılar için ikili (multipart/form-data) doğrudan fotoğraf yükleme uç noktası.
     Büyük base64 JSON dizilerinin güvenlik duvarı (WAF) tarafından yanlışlıkla engellenmesini %100 önler.
     """
+    _enforce_rate_limit(request, "vision", 10, 60)
     raw_bytes = b""
     mime_type = "image/jpeg"
     if image is not None:
@@ -992,16 +1093,26 @@ async def api_scan_lens_upload(
 
 # ----------------- Birim Fiyat Düşüş Alarmları API -----------------
 
+# Güvenlik: Alarmlar yalnızca oturum (doğrulanmış üye) ile görülebilir/silinebilir.
+# Eskiden ?email= parametresi yetiyordu; bu, başkasının e-postasıyla alarmlarını görmeye/silmeye izin veriyordu.
+# Oturumsuz kurulan alarmlar, aynı e-postayla giriş yapıldığında hesaba otomatik bağlanır.
+
 @app.get("/api/alerts")
 def api_list_alerts(
     email: str = "",
     x_session_token: Optional[str] = Header(default=None),
 ):
     member = social_service.get_member_by_token(x_session_token or "")
-    mid = member["member_id"] if member else None
+    if not member:
+        return {
+            "ok": True,
+            "login_required": True,
+            "alerts": [],
+            "live_email_enabled": alert_service.email_client.is_configured,
+        }
     return {
         "ok": True,
-        "alerts": alert_service.list_alerts(email=email, member_id=mid),
+        "alerts": alert_service.list_alerts(member_id=member["member_id"]),
         "live_email_enabled": alert_service.email_client.is_configured,
     }
 
@@ -1009,8 +1120,10 @@ def api_list_alerts(
 @app.post("/api/alerts")
 def api_create_alert(
     payload: CreatePriceAlertPayload,
+    request: Request,
     x_session_token: Optional[str] = Header(default=None),
 ):
+    _enforce_rate_limit(request, "alert-create", 10, 3600)
     member = social_service.get_member_by_token(x_session_token or "")
     mid = member["member_id"] if member else None
     res = alert_service.create_alert(
@@ -1031,8 +1144,9 @@ def api_pop_alert_notifications(
     x_session_token: Optional[str] = Header(default=None),
 ):
     member = social_service.get_member_by_token(x_session_token or "")
-    mid = member["member_id"] if member else None
-    items = alert_service.pop_pending_browser_notifications(email=email, member_id=mid)
+    if not member:
+        return {"ok": True, "triggered": [], "notifications": []}
+    items = alert_service.pop_pending_browser_notifications(member_id=member["member_id"])
     return {
         "ok": True,
         "triggered": items,
@@ -1047,8 +1161,9 @@ def api_delete_alert(
     x_session_token: Optional[str] = Header(default=None),
 ):
     member = social_service.get_member_by_token(x_session_token or "")
-    mid = member["member_id"] if member else None
-    res = alert_service.delete_alert(alert_id, email=email, member_id=mid)
+    if not member:
+        raise HTTPException(status_code=401, detail="Alarm silmek için giriş yapın.")
+    res = alert_service.delete_alert(alert_id, member_id=member["member_id"])
     fast_radar.sync_watchlist()
     return res
 
@@ -1205,35 +1320,44 @@ def api_create_order_intent(
 
 @app.get("/api/auth/config")
 def api_auth_config():
+    from email_auth import EmailOTPClient
+    from netgsm_sms import NetgsmClient
+
+    demo = os.getenv("DIPCI_DEMO_AUTH", "0").strip() == "1"
     return {
         "google_client_id": os.getenv("GOOGLE_CLIENT_ID", "").strip(),
-        "email_otp_enabled": True,
-        "sms_otp_enabled": True,
+        "email_otp_enabled": demo or EmailOTPClient().is_configured,
+        "sms_otp_enabled": demo or NetgsmClient().is_configured,
     }
 
 
 @app.post("/api/auth/request-otp")
-def api_request_otp(payload: OTPRequestPayload):
+def api_request_otp(payload: OTPRequestPayload, request: Request):
+    _enforce_rate_limit(request, "otp-request", 5, 3600)
     return social_service.request_phone_otp(payload.phone, payload.display_name)
 
 
 @app.post("/api/auth/verify-otp")
-def api_verify_otp(payload: OTPVerifyPayload):
+def api_verify_otp(payload: OTPVerifyPayload, request: Request):
+    _enforce_rate_limit(request, "otp-verify", 20, 3600)
     return social_service.verify_phone_otp(payload.phone, payload.otp_code)
 
 
 @app.post("/api/auth/request-email-otp")
-def api_request_email_otp(payload: EmailOTPRequestPayload):
+def api_request_email_otp(payload: EmailOTPRequestPayload, request: Request):
+    _enforce_rate_limit(request, "otp-request", 5, 3600)
     return social_service.request_email_otp(payload.email, payload.display_name)
 
 
 @app.post("/api/auth/verify-email-otp")
-def api_verify_email_otp(payload: EmailOTPVerifyPayload):
+def api_verify_email_otp(payload: EmailOTPVerifyPayload, request: Request):
+    _enforce_rate_limit(request, "otp-verify", 20, 3600)
     return social_service.verify_email_otp(payload.email, payload.otp_code)
 
 
 @app.post("/api/auth/google")
-def api_auth_google(payload: GoogleAuthPayload):
+def api_auth_google(payload: GoogleAuthPayload, request: Request):
+    _enforce_rate_limit(request, "google-auth", 20, 3600)
     return social_service.login_with_google_token(payload.credential)
 
 
@@ -1298,10 +1422,28 @@ def api_vote_deal(
 
 # ----------------- İş Ortağı Mağaza XML Kayıt Kapısı -----------------
 
+def _is_public_http_url(raw_url: str) -> bool:
+    """SSRF koruması: yalnızca herkese açık internet adreslerine giden http(s) URL'lerini kabul eder."""
+    try:
+        parsed = urlparse(raw_url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            return False
+        for info in socket.getaddrinfo(parsed.hostname, parsed.port or 443, proto=socket.IPPROTO_TCP):
+            ip = ipaddress.ip_address(info[4][0])
+            if not ip.is_global:
+                return False
+        return True
+    except (ValueError, OSError):
+        return False
+
+
 @app.post("/api/partners/xml-register")
-def api_register_partner_xml(payload: PartnerXMLPayload):
-    if not payload.store_name.strip() or not payload.xml_url.strip().startswith(("http://", "https://")):
-        return {"ok": False, "error": "Lütfen geçerli mağaza adı ve https:// XML besleme adresi girin."}
+def api_register_partner_xml(payload: PartnerXMLPayload, request: Request):
+    _enforce_rate_limit(request, "partner-xml", 3, 3600)
+    store_name = payload.store_name.strip()[:120]
+    xml_url = payload.xml_url.strip()
+    if not store_name or len(xml_url) > 2048 or not _is_public_http_url(xml_url):
+        return {"ok": False, "error": "Lütfen geçerli mağaza adı ve herkese açık https:// XML besleme adresi girin."}
 
     db.conn.execute(
         """
@@ -1309,10 +1451,10 @@ def api_register_partner_xml(payload: PartnerXMLPayload):
         VALUES (?, ?, ?, ?, ?)
         """,
         (
-            payload.store_name.strip(),
-            payload.brand_color,
-            payload.xml_url.strip(),
-            payload.contact_email.strip(),
+            store_name,
+            payload.brand_color[:16],
+            xml_url,
+            payload.contact_email.strip()[:200],
             datetime.now().isoformat(),
         ),
     )

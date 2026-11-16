@@ -134,7 +134,7 @@ def verify_google_id_token(id_token: str, expected_client_id: str = "") -> Tuple
     except Exception as e:
         return False, {}, f"Google doğrulama bağlantı hatası: {e}"
 
-    if expected_client_id and info.get("aud") != expected_client_id:
+    if not expected_client_id or info.get("aud") != expected_client_id:
         return False, {}, "Google uygulama kimliği (aud) eşleşmedi."
     if str(info.get("email_verified", "")).lower() != "true":
         return False, {}, "Google e-posta adresi doğrulanmamış."

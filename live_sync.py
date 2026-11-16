@@ -709,7 +709,7 @@ def sync_approved_partner_xmls(db: PriceMemoryDB) -> int:
         try:
             req = urllib.request.Request(row["xml_url"], headers={"User-Agent": "DipciBot/1.0 (+https://dipci.tr)"})
             with urllib.request.urlopen(req, timeout=25) as resp:
-                xml_bytes = resp.read()
+                xml_bytes = resp.read(50_000_000)  # 50 MB üst sınır
             cnt, _ = catalog_engine.ingest_partner_xml(xml_bytes, row["store_name"])
             written += cnt
         except Exception as e:

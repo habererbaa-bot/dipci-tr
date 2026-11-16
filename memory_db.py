@@ -46,8 +46,10 @@ class LiveMarketQuote:
 class PriceMemoryDB:
     def __init__(self, db_path: str | Path = ":memory:"):
         self.db_path = str(db_path)
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=15)
         self.conn.row_factory = sqlite3.Row
+        # Web işçileri ve radar/sync zamanlayıcıları aynı dosyaya yazarken "database is locked" yerine beklesin
+        self.conn.execute("PRAGMA busy_timeout = 15000")
         self._init_schema()
 
     def _init_schema(self) -> None:
