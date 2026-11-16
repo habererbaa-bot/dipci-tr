@@ -434,13 +434,38 @@ OCR_WORD_FIXES = {
 }
 
 
+# ReklamAction (ReklamStore) komisyon linkleri — Kemal 17 Kas 2026. Mağazanın kendi sitesine giden link,
+# ad.reklm.com takip linkine sarılır (url= derin bağlantı). Teklif no'ları yayıncı panelinden.
+REKLAMACTION_AFF_ID = os.getenv("REKLAMACTION_AFF_ID", "43815").strip()
+REKLAMACTION_OFFERS = {
+    "koctas.com.tr": "8937",   # Koçtaş [Satış] %2,20
+    "mi.com": "62394",         # Xiaomi [Satış / CPS] %2
+}
+
+
 def _apply_affiliate_url(url: str) -> str:
     if not url:
         return ""
-    if "amazon.com.tr" in url.lower():
+    low = url.lower()
+    if "amazon.com.tr" in low:
         sep = "&" if "?" in url else "?"
-        if "tag=" not in url.lower():
+        if "tag=" not in low:
             return f"{url}{sep}tag={AMAZON_ASSOCIATE_TAG}"
+        return url
+    if REKLAMACTION_AFF_ID and "reklm.com" not in low:
+        try:
+            host = urllib.parse.urlparse(url).netloc.lower().split(":")[0]
+        except Exception:
+            host = ""
+        for dom, offer_id in REKLAMACTION_OFFERS.items():
+            if host == dom or host.endswith("." + dom):
+                # Derin linkte takip parametreleri kendiliğinden eklenmiyor; {transaction_id} makrosunu ağ dolduruyor
+                deep = url + ("&" if "?" in url else "?") + ("utm_source=reklamaction&utm_medium=affiliate"
+                    f"&utm_campaign={REKLAMACTION_AFF_ID}" + "&transaction_id={transaction_id}")
+                return (
+                    f"https://ad.reklm.com/aff_c?offer_id={offer_id}&aff_id={REKLAMACTION_AFF_ID}"
+                    f"&url={urllib.parse.quote(deep, safe='')}"
+                )
     return url
 
 
