@@ -12,3 +12,4 @@ venv/
 *.zip
 node_modules/
 secrets/
+deploy/ev_proxy.log

@@ -53,6 +53,8 @@ from memory_db import PriceMemoryDB
 from variant_guard import is_same_variant
 from scanner import compute_ean13_with_check
 from seo_engine import CANONICAL_ORIGIN, key_to_slug
+import ev_baglanti
+ev_baglanti.kur()  # engellenen sitelere Kemal'in ev internetinden git (17 Kas 2026)
 
 _DB_WRITE_LOCK = threading.RLock()
 _DISCOVERY_CACHE: Dict[str, Tuple[float, Optional[str]]] = {}

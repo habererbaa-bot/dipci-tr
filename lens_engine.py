@@ -29,6 +29,8 @@ from live_sync import (
     resolve_sok_direct_product,
 )
 from memory_db import PriceMemoryDB
+import ev_baglanti
+ev_baglanti.kur()  # engellenen sitelere Kemal'in ev internetinden git (17 Kas 2026)
 
 AMAZON_ASSOCIATE_TAG = os.getenv("AMAZON_PARTNER_TAG", "marketdedekti-21").strip() or "marketdedekti-21"
 MARKET_IDENTITY_URL = "https://api.marketfiyati.org.tr/api/v2/searchByIdentity"

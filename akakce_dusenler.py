@@ -19,6 +19,8 @@ from pathlib import Path
 
 from auto_catalog import AutoCatalogEngine
 from memory_db import PriceMemoryDB
+import ev_baglanti
+ev_baglanti.kur()  # engellenen sitelere Kemal'in ev internetinden git (17 Kas 2026)
 
 AKAKCE = "https://www.akakce.com"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
