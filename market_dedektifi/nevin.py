@@ -192,6 +192,12 @@ def html_yap(metin: str, izinli: set) -> str:
 
 
 def main() -> int:
+    # Elle: son yazıyı basınca'ya (yeniden) gönder.  python nevin.py --gonder [basinca_id]
+    if len(sys.argv) > 1 and sys.argv[1] == "--gonder":
+        yol = sorted(CIKTI.glob("*.json"))[-1]
+        cikti = json.loads(yol.read_text(encoding="utf-8"))
+        print(basincaya_gonder(cikti, yol, int(sys.argv[2]) if len(sys.argv) > 2 else 0))
+        return 0
     bugun = datetime.now().strftime("%Y%m%d")
     if any(CIKTI.glob(f"{bugun}_*.json")):
         print("Bugünün yazısı zaten var.")
@@ -216,32 +222,60 @@ def main() -> int:
         "urunler": urunler,
     }
     CIKTI.mkdir(parents=True, exist_ok=True)
-    (CIKTI / f"{simdi:%Y%m%d_%H%M%S}.json").write_text(json.dumps(cikti, ensure_ascii=False, indent=2), encoding="utf-8")
-    durum = basincaya_gonder(cikti, f"dedektif:{simdi:%Y-%m-%d}")
+    yol = CIKTI / f"{simdi:%Y%m%d_%H%M%S}.json"
+    yol.write_text(json.dumps(cikti, ensure_ascii=False, indent=2), encoding="utf-8")
+    durum = basincaya_gonder(cikti, yol)
     print(json.dumps({"baslik": cikti["baslik"], "kelime": len(y["metin"].split()), "basinca": durum}, ensure_ascii=False))
     return 0
 
 
-def basincaya_gonder(cikti: dict, kaynak_id: str) -> str:
-    """Yazıyı basınca.com Market Dedektifi köşesine dipci kendisi ekler (Kemal, 17 Kas 2026).
-    Adres ve anahtar basınca tarafından verilir, .env'de durur; yoksa gönderilmez (basınca kendisi çeker)."""
-    adres = os.getenv("DEDEKTIF_YAYIN_ADRESI", "").strip()
-    anahtar = os.getenv("DEDEKTIF_YAYIN_ANAHTARI", "").strip()
-    if not adres or not anahtar:
-        return "yayin-adresi-yok"
-    duz = re.sub(r"\[([^\]]+)\]\([^)]+\)", lambda m: m.group(1), cikti["markdown"])
-    govde = json.dumps({
-        "baslik": cikti["baslik"], "spot": cikti["ozet_spot"], "html": cikti["html"], "metin": duz,
-        "tarih": cikti["uretim_zamani"], "kaynak_id": kaynak_id, "yazar": cikti["yazar"],
-    }, ensure_ascii=False).encode("utf-8")
-    req = urllib.request.Request(adres, data=govde, method="POST", headers={
-        "content-type": "application/json", "authorization": f"Bearer {anahtar}", "user-agent": "dipci-nevin/1.0"})
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            return f"gonderildi:{r.status}"
-    except Exception as e:
-        return f"hata:{str(e)[:120]}"
+def basinca_metni(markdown: str) -> str:
+    """basınca köşe metni: dipci bağlantıları basınca'nın biçimiyle ⟦adres|yazı⟧ (yazının içinde tıklanır link olur)."""
+    def bag(m):
+        yazi, url = m.group(1), m.group(2)
+        if url.startswith("https://dipci.tr/"):
+            return "⟦" + url + "|" + yazi + "⟧"
+        return yazi
+    t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", bag, markdown)
+    return t.replace("**", "").replace("__", "").strip()
 
+
+def _motor(govde: dict) -> dict:
+    site = os.getenv("BASINCA_SITE", "").strip().rstrip("/")
+    anahtar = os.getenv("BASINCA_MOTOR_TOKEN", "").strip()
+    if not site or not anahtar:
+        raise RuntimeError("basınca motor anahtarı yok")
+    req = urllib.request.Request(site + "/api/motor-yonet", data=json.dumps(govde, ensure_ascii=False).encode("utf-8"),
+                                 method="POST", headers={"content-type": "application/json", "authorization": f"Bearer {anahtar}",
+                                                         "user-agent": "dipci-nevin/1.0"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def basincaya_gonder(cikti: dict, yol: Path, basinca_id: int = 0) -> str:
+    """Yazıyı basınca.com Market Dedektifi köşesine dipci KENDİSİ ekler (Kemal, 17 Kas 2026:
+    "Bu yazıları dipçi ekleyecek"; MTR1'in kullandığı motor kapısı /api/motor-yonet, bölüm kose-yazilari)."""
+    try:
+        yazarlar = _motor({"koleksiyon": "kose-yazarlari", "islem": "listele", "limit": 100}).get("kayitlar") or []
+        yazar = next((y for y in yazarlar if "DEDEKT" in str(y.get("kose", "")).upper().replace("İ", "I") and y.get("durum") == "aktif"), None)
+        if not yazar:
+            return "hata:Market Dedektifi yazari yok"
+        veri = {"yazarId": yazar["id"], "baslik": cikti["baslik"], "spot": cikti["ozet_spot"],
+                "metin": basinca_metni(cikti["markdown"]), "durum": "yayinda"}
+        mevcut = basinca_id or int(cikti.get("basinca_id") or 0)
+        if mevcut:
+            r = _motor({"koleksiyon": "kose-yazilari", "islem": "guncelle", "id": mevcut, "veri": veri})
+            yeni = mevcut
+        else:
+            r = _motor({"koleksiyon": "kose-yazilari", "islem": "ekle", "veri": veri})
+            yeni = int(r.get("id") or 0)
+        if not r.get("ok", True) or not yeni:
+            return "hata:" + str(r)[:150]
+        cikti["basinca_id"] = yeni
+        yol.write_text(json.dumps(cikti, ensure_ascii=False, indent=2), encoding="utf-8")
+        return f"yayinda:{yeni}"
+    except Exception as e:
+        return f"hata:{str(e)[:150]}"
 
 if __name__ == "__main__":
     sys.exit(main())

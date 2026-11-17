@@ -631,6 +631,10 @@ def api_dedektif_gunun_yazisi():
     y = _son_dedektif_yazisi()
     if not y:
         return JSONResponse({"ok": False, "hata": "Henüz yazı üretilmedi"}, status_code=404)
+    if y.get("basinca_id"):
+        # dipci yazıyı basınca köşesine kendisi ekledi; basınca'nın çekme işi ikinci kez basmasın.
+        return JSONResponse({"ok": False, "not": "dipci kendisi yayınladı", "basinca_id": y["basinca_id"]},
+                            headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "no-store"})
     return JSONResponse(
         {
             "ok": True,
