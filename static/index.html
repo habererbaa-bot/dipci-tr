@@ -4574,5 +4574,35 @@
 
     bootApp();
   </script>
+  <script>
+    /* Ziyaretçi ölçümü (Kemal, 17 Kas 2026): sayfa görüntülemesini dipci'nin kendi sayacına bildirir.
+       Ziyaretin nereden geldiği (ilk girişteki site / utm) oturum boyunca saklanır. Kişisel bilgi gönderilmez. */
+    (function () {
+      try {
+        var ss = window.sessionStorage, ref = "", utm = "";
+        try { ref = ss.getItem("dz_ref"); utm = ss.getItem("dz_utm"); } catch (e) {}
+        if (ref === null) {
+          var q = new URLSearchParams(location.search);
+          ref = document.referrer || "";
+          utm = q.get("utm_source") || q.get("ref") || "";
+          try { ss.setItem("dz_ref", ref); ss.setItem("dz_utm", utm); } catch (e) {}
+        }
+        var son = "";
+        function gonder() {
+          var p = location.pathname;
+          if (p === son) return;
+          son = p;
+          var veri = JSON.stringify({ p: p, r: ref || "", u: utm || "" });
+          if (navigator.sendBeacon) navigator.sendBeacon("/api/z", new Blob([veri], { type: "application/json" }));
+          else fetch("/api/z", { method: "POST", headers: { "Content-Type": "application/json" }, body: veri, keepalive: true });
+        }
+        var rs = history.replaceState, ps = history.pushState;
+        history.replaceState = function () { var r = rs.apply(this, arguments); setTimeout(gonder, 0); return r; };
+        history.pushState = function () { var r = ps.apply(this, arguments); setTimeout(gonder, 0); return r; };
+        window.addEventListener("popstate", gonder);
+        gonder();
+      } catch (e) {}
+    })();
+  </script>
 </body>
 </html>

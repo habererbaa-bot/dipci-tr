@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Yönetim · Ziyaretçiler | dipci.tr</title>
+<link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{--lacivert:#0B132B;--yesil:#059669;--yesil-acik:#ECFDF5;--zemin:#F1F5F9;--kart:#fff;--cizgi:#E2E8F0;--yazi:#0F172A;--soluk:#64748B}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--zemin);color:var(--yazi);font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:14px}
+  header{background:var(--lacivert);color:#fff}
+  .w{max-width:1180px;margin:0 auto;padding:0 16px}
+  header .w{display:flex;align-items:center;justify-content:space-between;gap:12px;height:60px}
+  .logo{font-weight:800;font-size:20px;color:#fff;text-decoration:none}.logo b{color:#10B981}
+  .baslik{font-size:13px;color:#CBD5E1;font-weight:600}
+  .sekmeler{display:flex;gap:6px;background:#1E293B;padding:4px;border-radius:10px}
+  .sekmeler button{border:0;background:transparent;color:#CBD5E1;font:600 13px Inter,sans-serif;padding:8px 12px;border-radius:8px;cursor:pointer;min-height:36px}
+  .sekmeler button.on{background:#fff;color:var(--lacivert)}
+  main{padding:18px 0 40px}
+  .izgara{display:grid;gap:14px}
+  .k4{grid-template-columns:repeat(4,1fr)}
+  .k2{grid-template-columns:1fr 1fr}
+  .k3{grid-template-columns:2fr 1fr}
+  @media(max-width:900px){.k4{grid-template-columns:1fr 1fr}.k2,.k3{grid-template-columns:1fr}}
+  .kart{background:var(--kart);border:1px solid var(--cizgi);border-radius:14px;padding:16px}
+  .kart h2{font-size:13px;margin:0 0 12px;color:var(--soluk);font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .rakam{font-size:30px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+  .alt{font-size:12px;color:var(--soluk);margin-top:6px}
+  .art{color:var(--yesil);font-weight:700}.eks{color:#DC2626;font-weight:700}
+  .canli{background:var(--lacivert);color:#fff;border:0}
+  .canli h2{color:#94A3B8}
+  .nokta{display:inline-block;width:9px;height:9px;border-radius:50%;background:#10B981;margin-right:6px;box-shadow:0 0 0 0 rgba(16,185,129,.6);animation:nabiz 1.6s infinite}
+  @keyframes nabiz{70%{box-shadow:0 0 0 8px rgba(16,185,129,0)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+  .canli .liste div{display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-top:1px solid #1E293B;font-size:13px}
+  .canli .liste span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#E2E8F0}
+  .grafik{width:100%;height:220px;display:block}
+  .satir{display:grid;grid-template-columns:1fr auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid #F1F5F9;font-size:13px}
+  .satir:first-of-type{border-top:0}
+  .ad{position:relative;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:3px 8px;border-radius:6px;z-index:0}
+  .ad i{position:absolute;inset:0;background:var(--yesil-acik);z-index:-1;border-radius:6px}
+  .ad a{color:inherit;text-decoration:none}
+  .say{font-weight:700;font-variant-numeric:tabular-nums;min-width:40px;text-align:right}
+  .soluk{color:var(--soluk);font-size:12px;font-variant-numeric:tabular-nums;min-width:56px;text-align:right}
+  .bos{color:var(--soluk);font-size:13px;padding:8px 0}
+  .uyari{max-width:520px;margin:60px auto;text-align:center;background:#fff;border:1px solid var(--cizgi);border-radius:14px;padding:28px}
+  .uyari a{display:inline-block;margin-top:14px;background:var(--yesil);color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:700}
+  .bilgi{font-size:12px;color:var(--soluk);margin-top:14px}
+</style>
+</head>
+<body>
+<header><div class="w">
+  <div style="display:flex;align-items:center;gap:12px"><a class="logo" href="/">dipci<b>.tr</b></a><span class="baslik">Yönetim · Ziyaretçiler</span></div>
+  <div class="sekmeler" role="tablist" aria-label="Zaman aralığı">
+    <button data-a="gun" class="on" role="tab">Bugün</button>
+    <button data-a="hafta" role="tab">7 gün</button>
+    <button data-a="ay" role="tab">30 gün</button>
+  </div>
+</div></header>
+
+<main class="w" id="icerik">
+  <p class="bos">Yükleniyor…</p>
+</main>
+
+<script>
+(function () {
+  var aralik = "gun", zaman = null;
+  var token = "";
+  try { token = localStorage.getItem("dipci_session_token") || ""; } catch (e) {}
+  var ADLAR = { gun: "Bugün (saatlik)", hafta: "Son 7 gün", ay: "Son 30 gün" };
+
+  function n(x) { return Number(x || 0).toLocaleString("tr-TR"); }
+  function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function grafik(seri) {
+    var W = 1000, H = 220, ust = 16, alt = 26, sol = 36;
+    var mx = Math.max(1, Math.max.apply(null, seri.map(function (s) { return s.ziyaretci; })));
+    var adim = Math.pow(10, Math.floor(Math.log10(mx))); var tavan = Math.ceil(mx / adim) * adim;
+    var bw = (W - sol) / seri.length, out = "";
+    for (var g = 0; g <= 4; g++) {
+      var y = ust + (H - ust - alt) * (1 - g / 4), v = Math.round(tavan * g / 4);
+      out += '<line x1="' + sol + '" x2="' + W + '" y1="' + y + '" y2="' + y + '" stroke="#EEF2F6"/>' +
+        '<text x="' + (sol - 6) + '" y="' + (y + 4) + '" text-anchor="end" font-size="11" fill="#94A3B8">' + n(v) + "</text>";
+    }
+    seri.forEach(function (s, i) {
+      var h = (H - ust - alt) * s.ziyaretci / tavan, x = sol + i * bw + bw * 0.18, y = H - alt - h;
+      out += '<rect x="' + x + '" y="' + y + '" width="' + (bw * 0.64) + '" height="' + Math.max(h, s.ziyaretci ? 2 : 0) + '" rx="3" fill="#10B981">' +
+        "<title>" + esc(s.etiket) + ": " + n(s.ziyaretci) + " ziyaretçi, " + n(s.goruntuleme) + " görüntüleme</title></rect>";
+      var her = seri.length > 16 ? (seri.length > 24 ? 5 : 3) : 1;
+      if (i % her === 0) out += '<text x="' + (sol + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle" font-size="11" fill="#94A3B8">' + esc(s.etiket) + "</text>";
+    });
+    return '<svg class="grafik" viewBox="0 0 ' + W + " " + H + '" preserveAspectRatio="none" role="img" aria-label="Ziyaretçi grafiği">' + out + "</svg>";
+  }
+
+  function tablo(liste, link) {
+    if (!liste || !liste.length) return '<p class="bos">Henüz veri yok.</p>';
+    var mx = Math.max.apply(null, liste.map(function (x) { return x.ziyaretci; })) || 1;
+    return liste.map(function (x) {
+      var ad = link && x.adres ? '<a href="' + esc(x.adres) + '" target="_blank" rel="noopener">' + esc(x.ad) + "</a>" : esc(x.ad);
+      return '<div class="satir"><div class="ad"><i style="width:' + Math.round(100 * x.ziyaretci / mx) + '%"></i>' + ad + '</div>' +
+        '<div class="say">' + n(x.ziyaretci) + '</div><div class="soluk">' + n(x.goruntuleme) + " gör.</div></div>";
+    }).join("");
+  }
+
+  function ciz(d) {
+    var o = d.ozet, a = d.anlik;
+    var fark = o.dun_ziyaretci ? Math.round(100 * (o.bugun_ziyaretci - o.dun_ziyaretci) / o.dun_ziyaretci) : null;
+    var farkYazi = fark === null ? "dün veri yok" : (fark >= 0 ? '<span class="art">▲ %' + fark + "</span> düne göre" : '<span class="eks">▼ %' + Math.abs(fark) + "</span> düne göre");
+    document.getElementById("icerik").innerHTML =
+      '<div class="izgara k3">' +
+        '<div class="kart canli"><h2><span class="nokta"></span>Şu an sitede</h2><div class="rakam">' + n(a.ziyaretci_5dk) + '</div>' +
+          '<div class="alt" style="color:#94A3B8">son 5 dakika · son 30 dakikada ' + n(a.ziyaretci_30dk) + ' kişi</div>' +
+          '<div class="liste" style="margin-top:10px">' + (a.sayfalar.length ? a.sayfalar.map(function (s) { return "<div><span>" + esc(s.sayfa) + "</span><span>" + n(s.n) + "</span></div>"; }).join("") : '<div><span>Şu an kimse yok</span><span></span></div>') + "</div></div>" +
+        '<div class="izgara k2" style="gap:14px">' +
+          '<div class="kart"><h2>Bugün ziyaretçi</h2><div class="rakam">' + n(o.bugun_ziyaretci) + '</div><div class="alt">' + farkYazi + "</div></div>" +
+          '<div class="kart"><h2>Bugün görüntüleme</h2><div class="rakam">' + n(o.bugun_goruntuleme) + '</div><div class="alt">sayfa açılışı</div></div>' +
+          '<div class="kart"><h2>Son 7 gün</h2><div class="rakam">' + n(o.hafta_ziyaretci) + '</div><div class="alt">günlük tekil ziyaretçi toplamı</div></div>' +
+          '<div class="kart"><h2>Son 30 gün</h2><div class="rakam">' + n(o.ay_ziyaretci) + '</div><div class="alt">' + n(o.ay_goruntuleme) + " görüntüleme</div></div>" +
+        "</div>" +
+      "</div>" +
+      '<div class="kart" style="margin-top:14px"><h2>' + ADLAR[d.aralik] + " · ziyaretçi</h2>" + grafik(d.seri) + "</div>" +
+      '<div class="izgara k2" style="margin-top:14px">' +
+        '<div class="kart"><h2>Nereden geliyorlar</h2>' + tablo(d.kaynaklar) + "</div>" +
+        '<div class="kart"><h2>En çok bakılan sayfalar</h2>' + tablo(d.sayfalar, true) + "</div>" +
+        '<div class="kart"><h2>Gelen siteler</h2>' + tablo(d.siteler) + "</div>" +
+        '<div class="kart"><h2>Cihaz</h2>' + tablo(d.cihazlar) + '<h2 style="margin-top:18px">Kampanya kaynakları (utm)</h2>' + tablo(d.kampanyalar) + "</div>" +
+      "</div>" +
+      '<p class="bilgi">Robotlar sayılmaz; kişisel bilgi saklanmaz. Ziyaretçi = o gün siteye giren tekil kişi. Sayfa 30 saniyede bir kendini yeniler.</p>';
+  }
+
+  function yukle() {
+    fetch("/api/yonetim/trafik?aralik=" + aralik, { headers: { "X-Session-Token": token }, cache: "no-store" })
+      .then(function (r) { if (r.status === 403) throw new Error("yetki"); return r.json(); })
+      .then(ciz)
+      .catch(function (e) {
+        if (e.message === "yetki") {
+          clearInterval(zaman);
+          document.getElementById("icerik").innerHTML = '<div class="uyari"><h2 style="margin:0 0 8px;font-size:18px">Bu sayfa yöneticiye özel</h2>' +
+            "<p style=\"color:#64748B;margin:0\">dipci.tr'de yönetici hesabıyla giriş yapıp bu sayfayı yeniden açın.</p><a href=\"/\">dipci.tr'ye git ve giriş yap</a></div>";
+        }
+      });
+  }
+
+  document.querySelectorAll(".sekmeler button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".sekmeler button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on"); aralik = b.getAttribute("data-a"); yukle();
+    });
+  });
+  yukle();
+  zaman = setInterval(yukle, 30000);
+})();
+</script>
+</body>
+</html>

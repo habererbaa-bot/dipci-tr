@@ -664,6 +664,44 @@ def serve_dedektif_onizleme():
     return HTMLResponse(sayfa, headers=NO_CACHE_HTML_HEADERS)
 
 
+# ——— Ziyaretçi ölçümü ve yönetim paneli (Kemal, 17 Kas 2026) ———
+class ZiyaretPayload(BaseModel):
+    p: str = "/"
+    r: str = ""
+    u: str = ""
+
+
+@app.post("/api/z")
+def api_ziyaret(payload: ZiyaretPayload, request: Request):
+    import ziyaret
+    ip = _client_ip(request)
+    if _limiter.allow(f"z:{ip}", 120, 60):
+        try:
+            ziyaret.kaydet(ip, request.headers.get("user-agent", ""), payload.p, payload.r[:300], payload.u)
+        except Exception:
+            pass
+    return Response(status_code=204)
+
+
+def _yonetici_mi(token: str) -> bool:
+    uye = social_service.get_member_by_token(token or "")
+    izinli = {x.strip() for x in os.getenv("ADMIN_MEMBER_IDS", "").split(",") if x.strip()}
+    return bool(uye and str(uye.get("member_id")) in izinli)
+
+
+@app.get("/api/yonetim/trafik")
+def api_yonetim_trafik(aralik: str = "gun", x_session_token: Optional[str] = Header(default=None)):
+    import ziyaret
+    if not _yonetici_mi(x_session_token or ""):
+        return JSONResponse({"ok": False, "hata": "yetki yok"}, status_code=403)
+    return JSONResponse(ziyaret.rapor(aralik if aralik in ("gun", "hafta", "ay") else "gun"), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/yonetim", response_class=HTMLResponse)
+def serve_yonetim():
+    return HTMLResponse((STATIC_DIR / "yonetim.html").read_text(encoding="utf-8"), headers=NO_CACHE_HTML_HEADERS)
+
+
 @app.get("/reklam/kutu/{tur}", response_class=HTMLResponse)
 def serve_reklam_kutusu(tur: str, sure: int = 7):
     """basınca'ya bir kez gömülen dipci reklam kutusu (Kemal, 17 Kas 2026).
