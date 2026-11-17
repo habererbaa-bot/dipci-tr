@@ -581,6 +581,77 @@ def api_basinca_reklamlar(tur: str = "karisik", limit: int = 12):
     )
 
 
+DEDEKTIF_DIR = BASE_DIR / "data" / "dedektif"
+
+
+@app.get("/api/dedektif/kart/{product_key}")
+def api_dedektif_urun_karti(product_key: str):
+    """Market Dedektifi yazısındaki ürün kartı: görsel + 3-5 mağaza fiyat sıralaması (Kemal, 17 Kas 2026)."""
+    import basinca_ads
+    r = db.conn.execute("SELECT * FROM product_catalog_index WHERE product_key = ?", (product_key[:160],)).fetchone()
+    if not r:
+        return JSONResponse({"ok": False}, status_code=404)
+    quotes = basinca_ads._clean_quotes(json.loads(r["top_quotes_json"] or "[]"))
+    magazalar = []
+    for q in quotes:
+        ad, renk, yazi = basinca_ads.BRANDS.get(q["platform"], basinca_ads.DEFAULT_BRAND)
+        magazalar.append({"magaza": ad, "fiyat": q["pack_price"], "fiyat_yazi": basinca_ads._tl(q["pack_price"]), "renk": renk, "yazi_rengi": yazi})
+    return JSONResponse(
+        {
+            "ok": bool(magazalar),
+            "baslik": f"{r['brand']} {r['family_name']}".strip(),
+            "gorsel": r["image_url"] or "",
+            "link": f"https://dipci.tr/urun/{product_key.replace('_', '-')}?utm_source=basinca&utm_medium=market_dedektifi",
+            "magazalar": magazalar,
+        },
+        headers={"Access-Control-Allow-Origin": "*"},
+    )
+
+
+def _son_dedektif_yazisi() -> Optional[dict]:
+    try:
+        dosyalar = sorted(DEDEKTIF_DIR.glob("*.json"))
+    except Exception:
+        return None
+    if not dosyalar:
+        return None
+    return json.loads(dosyalar[-1].read_text(encoding="utf-8"))
+
+
+@app.get("/api/dedektif/gunun-yazisi")
+def api_dedektif_gunun_yazisi():
+    """basinca.com Market Dedektifi köşesi her gün bunu çeker: başlık, spot, hazır HTML gövde (Kemal, 17 Kas 2026)."""
+    y = _son_dedektif_yazisi()
+    if not y:
+        return JSONResponse({"ok": False, "hata": "Henüz yazı üretilmedi"}, status_code=404)
+    return JSONResponse(
+        {
+            "ok": True,
+            "yazar": "Market Dedektifi",
+            "tarih": y.get("uretim_zamani"),
+            "baslik": y.get("baslik"),
+            "spot": y.get("ozet_spot"),
+            "html": y.get("html"),
+            "sosyal_medya": y.get("sosyal_medya"),
+        },
+        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "no-store"},
+    )
+
+
+@app.get("/dedektif/gunun-yazisi", response_class=HTMLResponse)
+def serve_dedektif_onizleme():
+    y = _son_dedektif_yazisi()
+    if not y:
+        return HTMLResponse("<p>Henüz yazı üretilmedi.</p>", status_code=404)
+    sayfa = (
+        '<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        f"<title>Market Dedektifi önizleme</title></head><body style=\"margin:0;padding:20px;background:#F8FAFC\">"
+        f"<p style=\"font-family:Arial;color:#64748B;font-size:13px\">basinca.com Market Dedektifi köşesine gidecek günün yazısı (önizleme) — {y.get('uretim_zamani', '')[:16]}</p>"
+        f"{y.get('html', '')}</body></html>"
+    )
+    return HTMLResponse(sayfa, headers=NO_CACHE_HTML_HEADERS)
+
+
 @app.get("/reklam/basinca.js")
 def serve_basinca_reklam_js():
     """basinca.com'a yapıştırılan canlı reklam kodu: ürünü ve fiyatları her açılışta dipci.tr'den çeker."""

@@ -1,0 +1,19 @@
+{
+  "dipci_api_origin": "https://dipci.tr",
+  "yayin_platformu": "basinca.com",
+  "yazar_adi": "Market Dedektifi",
+  "ai_provider": "auto",
+  "gemini_api_key": "",
+  "deepseek_api_key": "",
+  "openai_api_key": "",
+  "affiliate": {
+    "amazon_tag": "marketdedekti-21",
+    "reklamaction_pub_id": "",
+    "admitad_campaign_code": "",
+    "awin_aff_id": "",
+    "awin_merchant_map": {},
+    "hepsiburada_utmsource": "",
+    "utm_source": "basinca_market_dedektifi"
+  },
+  "basinca_webhook_url": ""
+}
