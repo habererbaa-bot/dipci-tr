@@ -627,7 +627,8 @@ def api_dedektif_gunun_yazisi():
     return JSONResponse(
         {
             "ok": True,
-            "yazar": "Market Dedektifi",
+            "yazar": y.get("yazar") or "Market Dedektifi",
+            "kose": y.get("kose") or "Market Dedektifi",
             "tarih": y.get("uretim_zamani"),
             "baslik": y.get("baslik"),
             "spot": y.get("ozet_spot"),
