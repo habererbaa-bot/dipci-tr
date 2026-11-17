@@ -66,8 +66,8 @@ def _kaynak(ref: str, utm: str, kendi_host: str = "dipci.tr") -> tuple:
         u = utm.lower()
         for ad, parcalar in KAYNAK_ADLARI:
             if any(p.split(".")[0] in u for p in parcalar):
-                return ad, host or utm
-        return utm[:40], host or utm
+                return ad, host
+        return utm[:40], host
     if not host or host.endswith(kendi_host):
         return "Doğrudan", host or ""
     for ad, parcalar in KAYNAK_ADLARI:
@@ -105,6 +105,8 @@ def _sayfa_adi(p: str) -> str:
         return "Ana sayfa"
     if p.startswith("/urun/"):
         return "Ürün: " + p[6:].replace("-", " ")[:60]
+    if p == "/sepet":
+        return "Sepet"
     if p.startswith("/kategori/"):
         return "Kategori: " + p[10:]
     return p
