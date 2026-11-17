@@ -1527,16 +1527,26 @@ class AutoCatalogEngine:
             "online_offers_persisted": offers_count,
         }
 
-    def enrich_online_offers(self, limit: int = 250, state_path: Optional[Path] = None) -> Dict:
+    def enrich_online_offers(self, limit: int = 250, state_path: Optional[Path] = None, magaza: bool = False) -> Dict:
         """Katalogdaki market ürünlerine online mağaza (PTT AVM, n11, Hepsiburada, Amazon, Trendyol...) fiyatlarını ekler.
         Kemal 16 Kas 2026: Nescafe Gold'da PTT AVM ve n11 marketlerden ucuzdu ama kartta görünmüyordu.
         Her çalışmada sıradaki `limit` ürün taranır (dönüşümlü); Akakçe'yi yormamak için yavaş gider."""
         t0 = time.time()
         rows = self.db.conn.execute(
-            "SELECT product_key, brand, family_name FROM product_catalog_index ORDER BY offer_count DESC, product_key"
+            "SELECT product_key, brand, family_name, category FROM product_catalog_index ORDER BY offer_count DESC, product_key"
         ).fetchall()
         if not rows:
             return {"ok": True, "enriched": 0}
+        # Mağazaların kendi sitelerinden doğrulama/ek fiyat (Trendyol, n11, Pazarama, Amazon, Teknosa, Vatan) (Kemal, 17 Kas 2026)
+        tarayici = None
+        if magaza:
+            try:
+                from magaza_tarayici import MagazaTarayici
+                tarayici = MagazaTarayici().__enter__()
+            except Exception as e:
+                print("magaza tarayici acilamadi:", e)
+                tarayici = None
+        magaza_eklenen = 0
         state_path = state_path or (Path(__file__).resolve().parent / "data" / "online_enrich_offset.txt")
         try:
             start = int(state_path.read_text().strip() or 0) % len(rows)
@@ -1551,6 +1561,18 @@ class AutoCatalogEngine:
                 offers, _meta = self.lens._search_online_marketplaces_live(q, _extract_pack_info_from_text(q))
             except Exception:
                 offers = []
+            if tarayici is not None:
+                try:
+                    ek = tarayici.ara(q, r["category"])
+                except Exception:
+                    ek = []
+                var = {o["platform"]: o for o in offers}
+                for o in ek:
+                    eski = var.get(o["platform"])
+                    if not eski or o["price"] < eski["price"]:
+                        var[o["platform"]] = o
+                        magaza_eklenen += 1
+                offers = list(var.values())
             if offers:
                 pk = self.persist_offers_for_product(
                     raw_brand=r["brand"], raw_title=q, offers=offers,
@@ -1563,13 +1585,18 @@ class AutoCatalogEngine:
                 self.db.conn.commit()
             time.sleep(1.2)
         self.db.conn.commit()
+        if tarayici is not None:
+            try:
+                tarayici.__exit__(None, None, None)
+            except Exception:
+                pass
         try:
             state_path.write_text(str((start + len(batch)) % len(rows)))
         except Exception:
             pass
         indexed = self.db.rebuild_catalog_index()
         return {"ok": True, "elapsed_sec": round(time.time() - t0, 1), "scanned": len(batch),
-                "enriched": enriched, "online_offers_added": offers_added, "indexed": indexed}
+                "enriched": enriched, "online_offers_added": offers_added, "magaza_sitesi_teklif": magaza_eklenen, "indexed": indexed}
 
     def harvest_broad_catalog(self, include_online: bool = True, max_pages: int = 4) -> Dict:
         t0 = time.time()
@@ -1617,6 +1644,7 @@ def main() -> None:
     parser.add_argument("--import-bundles", type=str, default="", help="Önceden çekilmiş JSON paketlerini içe aktar")
     parser.add_argument("--discover", type=str, default="", help="Tekil ürün sorgusunu keşfet ve kaydet")
     parser.add_argument("--enrich-online", type=int, default=0, help="Sıradaki N ürüne online mağaza fiyatı ekle")
+    parser.add_argument("--magaza", action="store_true", help="Mağazaların kendi sitelerini de gerçek tarayıcıyla oku")
     args = parser.parse_args()
 
     base_dir = Path(__file__).resolve().parent
@@ -1646,7 +1674,7 @@ def main() -> None:
             return
 
     if args.enrich_online:
-        print(json.dumps(engine.enrich_online_offers(limit=args.enrich_online), ensure_ascii=False, indent=2))
+        print(json.dumps(engine.enrich_online_offers(limit=args.enrich_online, magaza=args.magaza), ensure_ascii=False, indent=2))
         return
 
     if args.discover:
