@@ -12,6 +12,7 @@ import time
 from collections import defaultdict, deque
 from dataclasses import asdict
 from datetime import datetime
+import sqlite3
 from pathlib import Path
 from typing import Optional
 
@@ -87,10 +88,15 @@ ensure_seeded(db, social_service)
 _idx_count = db.conn.execute("SELECT COUNT(*) AS c FROM product_catalog_index").fetchone()["c"]
 _prod_count = db.conn.execute("SELECT COUNT(*) AS c FROM canonical_products WHERE is_private_label = 0").fetchone()["c"]
 if _idx_count < _prod_count:
-    auto_catalog.reclassify_existing_catalog()
-    db.rebuild_catalog_index()
-    fast_radar.sync_watchlist()
-    fast_radar.detect_and_publish_drops()
+    # Arka plandaki tarama veritabanını o an kilitliyorsa site açılışı çökmesin (17 Kas 2026).
+    try:
+        auto_catalog.reclassify_existing_catalog()
+        db.rebuild_catalog_index()
+        fast_radar.sync_watchlist()
+        fast_radar.detect_and_publish_drops()
+    except sqlite3.OperationalError as _e:
+        db.conn.rollback()
+        print(f"[dipci] Açılış indeks yenilemesi atlandı (veritabanı meşgul): {_e}")
 
 _DOCS_ENABLED = os.getenv("DIPCI_ENABLE_DOCS", "0").strip() == "1"
 
