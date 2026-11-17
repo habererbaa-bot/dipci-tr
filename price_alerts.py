@@ -348,11 +348,11 @@ class PriceAlertService:
     def _send_alert_email(self, alert_row, best_q) -> None:
         prod_name = f"{alert_row['brand']} {alert_row['family_name']}"
         prod_url = f"{CANONICAL_ORIGIN}/urun/{key_to_slug(alert_row['product_key'])}"
-        subject = f"🔔 Dip Fiyat Yakalandı: {prod_name} ({best_q.effective_unit_price:.2f} TL/{alert_row['base_unit']})"
+        subject = f"Dip Alarmı: dibe indi → {prod_name} ({best_q.effective_unit_price:.2f} TL/{alert_row['base_unit']})"
         html_body = f"""
         <div style="font-family:Inter,Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;background:#fff">
-          <div style="font-size:18px;font-weight:900;color:#0f172a">dipci<span style="color:#10b981">.tr</span> Fiyat Alarmı</div>
-          <h2 style="font-size:16px;margin-top:14px;color:#065f46">{prod_name} hedef fiyatınıza düştü!</h2>
+          <div style="font-size:18px;font-weight:900;color:#0f172a">dipci<span style="color:#10b981">.tr</span> Dip Alarmı</div>
+          <h2 style="font-size:16px;margin-top:14px;color:#065f46">{prod_name} dibe indi: hedef fiyatınıza düştü!</h2>
           <p style="font-size:14px;color:#334155">
             <strong>{best_q.seller_name}</strong> mağazasında güncel birim fiyat:
             <strong>{best_q.effective_unit_price:.2f} TL / {alert_row['base_unit']}</strong>
@@ -367,7 +367,7 @@ class PriceAlertService:
             if self.email_client.resend_api_key:
                 payload = json.dumps(
                     {
-                        "from": f"dipci.tr Alarm <{self.email_client.smtp_from}>",
+                        "from": f"dipci.tr Dip Alarmı <{self.email_client.smtp_from}>",
                         "to": [alert_row["email"]],
                         "subject": subject,
                         "html": html_body,

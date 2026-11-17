@@ -107,11 +107,11 @@
 
       <!-- Sağ Kurumsal Aksiyonlar -->
       <div class="flex items-center gap-2 shrink-0">
-        <button onclick="openAlertModal()" title="Fiyat Alarmlarım" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition">
+        <button onclick="openAlertModal()" title="Dip Alarmlarım" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
           </svg>
-          <span class="hidden sm:inline">Fiyat Alarmı</span>
+          <span class="hidden sm:inline">Dip Alarmı</span>
         </button>
 
         <div id="authHeaderSlot">
@@ -287,9 +287,9 @@
           <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[11px] font-semibold mb-1">
             15 Dakikada Bir Öncelikli Canlı Kontrol
           </div>
-          <h3 id="alertModalTitle" class="text-base font-semibold text-slate-900">Anlık Fiyat Düşüş Alarmı</h3>
+          <h3 id="alertModalTitle" class="text-base font-semibold text-slate-900">Dip Alarmı</h3>
           <p class="text-xs text-slate-500 mt-0.5">
-            Alarm kurduğunuz ürünler hızlı radar listesine alınır; hedef fiyata indiği anda e-posta ve tarayıcı bildirimi gönderilir.
+            Dip alarmı kurduğunuz ürünü radarımıza alırız; fiyatı hedefinize, yani dibe indiği an e-posta ve tarayıcı bildirimiyle haber veririz.
           </p>
         </div>
         <button onclick="closeAlertModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 text-sm font-medium">✕</button>
@@ -317,17 +317,17 @@
           <span class="text-[11px] text-slate-400">Ücretsiz • İstediğiniz an iptal</span>
         </div>
         <button onclick="submitPriceAlert()" class="w-full py-2.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-medium text-xs transition">
-          Hızlı Radara Ekle ve Alarm Kur
+          Dip Alarmı Kur
         </button>
       </div>
 
       <div class="space-y-2">
         <div class="text-xs font-semibold text-slate-700 flex items-center justify-between">
-          <span>Takip Edilen Alarmlarınız</span>
+          <span>Kurduğunuz Dip Alarmları</span>
           <button onclick="loadUserAlerts()" class="text-slate-600 hover:text-slate-900 underline">Yenile</button>
         </div>
         <div id="alertListContainer" class="space-y-2 text-xs text-slate-500">
-          Kayıtlı fiyat alarmınız bulunmuyor.
+          Henüz dip alarmınız yok.
         </div>
       </div>
     </div>
@@ -987,7 +987,7 @@
           showToast(msg, "success");
           if ("Notification" in window && Notification.permission === "granted") {
             try {
-              const notif = new Notification("dipci.tr Fiyat Düşüş Alarmı", {
+              const notif = new Notification("dipci.tr Dip Alarmı", {
                 body: msg,
                 icon: "/static/brand/favicon.svg"
               });
@@ -1559,14 +1559,14 @@
                 </button>
                 <button
                   type="button"
-                  title="Bu ürüne fiyat düşüş alarmı kur"
+                  title="Bu ürüne dip alarmı kur"
                   onclick="event.stopPropagation();openAlertModal('${p.product_key}')"
                   class="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 text-xs font-medium transition inline-flex items-center gap-1"
                 >
                   <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                   </svg>
-                  <span>Alarm</span>
+                  <span>Dip Alarmı</span>
                 </button>
               </div>
 
@@ -2058,7 +2058,7 @@
                 onclick="openAlertModal('${prod.product_key}')"
                 class="px-3.5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition"
               >
-                Fiyat Alarmı
+                Dip Alarmı
               </button>
               <button
                 onclick="openProductInScanner('${(d.barcodes[0] && d.barcodes[0].gtin) || ''}')"
@@ -2200,7 +2200,7 @@
         if (btn) btn.textContent = "Tarayıcı bildirimleri aktif ✓";
         showToast("Tarayıcı anlık bildirimleri aktif edildi.", "success");
       } else {
-        showToast("Bildirim izni verilmedi; alarmlar e-posta ile iletilecektir.", "info");
+        showToast("Bildirim izni verilmedi; dip alarmları e-posta ile iletilecek.", "info");
       }
     }
 
@@ -2265,7 +2265,7 @@
       const email = (document.getElementById("alertEmailInput").value || "").trim();
       const targetVal = parseFloat(document.getElementById("alertTargetPriceInput").value || "0");
       if (!activeAlertProductKey) {
-        showToast("Lütfen önce alarm kurmak istediğiniz ürünü seçin.", "error");
+        showToast("Lütfen önce dip alarmı kurmak istediğiniz ürünü seçin.", "error");
         return;
       }
       const { data } = await apiFetch("/api/alerts", {
@@ -2277,7 +2277,7 @@
         })
       });
       if (!data.ok) {
-        showToast(data.error || "Alarm oluşturulamadı.", "error");
+        showToast(data.error || "Dip alarmı kurulamadı.", "error");
         return;
       }
       localStorage.setItem("dipci_alert_email", data.email || email);
@@ -2291,14 +2291,14 @@
       if (!container) return;
       if (!appState.member) {
         container.innerHTML = email
-          ? '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Alarmınız kuruldu; fiyat düştüğünde e-posta ile haber vereceğiz. Alarmlarınızı görmek ve yönetmek için aynı e-posta adresiyle giriş yapın.</div>'
+          ? '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Dip alarmınız kuruldu; fiyat dibe indiğinde e-posta ile haber vereceğiz. Dip alarmlarınızı görmek ve yönetmek için aynı e-posta adresiyle giriş yapın.</div>'
           : '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Alarmlarınızı görmek ve yönetmek için giriş yapın.</div>';
         return;
       }
       const { data } = await apiFetch("/api/alerts");
       const list = (data && data.alerts) || [];
       if (list.length === 0) {
-        container.innerHTML = '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Kayıtlı fiyat alarmınız bulunmuyor.</div>';
+        container.innerHTML = '<div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-500">Henüz dip alarmınız yok.</div>';
         return;
       }
       container.innerHTML = list.map(a => {
@@ -3095,7 +3095,7 @@
                 RSS Beslemesi ↗
               </a>
               <button onclick="openAlertModal()" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium">
-                Fiyat Alarmı Kur
+                Dip Alarmı Kur
               </button>
             </div>
           </div>
