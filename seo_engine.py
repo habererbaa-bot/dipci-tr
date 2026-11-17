@@ -353,7 +353,7 @@ def render_seo_hydrated_spa(
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <link rel="canonical" href="{esc_canon}" />
   <link rel="alternate" hreflang="tr-TR" href="{esc_canon}" />
-  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=2" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=3" />
   <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png" />
   <link rel="manifest" href="/static/manifest.json" />
@@ -589,7 +589,7 @@ def build_corporate_identity_html() -> str:
   <title>Kurumsal Kimlik, Algoritmik Şeffaflık &amp; Yasal İlkeler | dipci.tr</title>
   <meta name="description" content="dipci.tr kurumsal kimlik kılavuzu, 7 katmanlı bağımsız fiyat denetim metodolojisi, KVKK aydınlatma ilkeleri ve gelir ortaklığı şeffaflık beyanı." />
   <link rel="canonical" href="{CANONICAL_ORIGIN}/kurumsal" />
-  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=2" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=3" />
   <link rel="stylesheet" href="/static/app.css" />
   <script type="application/ld+json">{org_ld}</script>
 </head>
@@ -741,7 +741,7 @@ def build_legal_page_html(slug: str) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} | dipci.tr</title>
   <link rel="canonical" href="{CANONICAL_ORIGIN}/{slug}" />
-  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=2" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=3" />
   <style>
     body{{margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.65}}
     header{{background:#fff;border-bottom:1px solid #e2e8f0}}
