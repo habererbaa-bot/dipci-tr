@@ -98,6 +98,14 @@ if _idx_count < _prod_count:
         db.conn.rollback()
         print(f"[dipci] Açılış indeks yenilemesi atlandı (veritabanı meşgul): {_e}")
 
+# basınca reklam kodlarının ürün havuzlarını arka planda hazırla (ilk okur beklemesin).
+try:
+    import basinca_ads as _basinca_ads
+
+    _basinca_ads.warm_pools(db)
+except Exception as _e:
+    print(f"[dipci] basinca reklam havuzu hazırlanamadı: {_e}")
+
 _DOCS_ENABLED = os.getenv("DIPCI_ENABLE_DOCS", "0").strip() == "1"
 
 app = FastAPI(
@@ -562,28 +570,72 @@ def serve_lens_seo_page():
 @app.get("/api/basinca/reklamlar")
 def api_basinca_reklamlar(tur: str = "karisik", limit: int = 12):
     """basinca.com akışı için dipci.tr reklamları (Kemal, 17 Kas 2026).
-    tur: dip (gerçek indirimler) | kampanya (online'da en ucuz) | karisik (ikisi sırayla)."""
+    tur: 8 reklam kodundan biri (bkz. /api/basinca/reklam-kodlari) ya da karisik (hepsi sırayla)."""
     import basinca_ads
     limit = max(1, min(int(limit or 12), 40))
-    if tur in ("dip", "kampanya"):
-        items = basinca_ads.list_ads(db, fast_radar, tur, limit)
-    else:
-        a = basinca_ads.list_ads(db, fast_radar, "dip", limit)
-        b = basinca_ads.list_ads(db, fast_radar, "kampanya", limit)
-        items = []
-        for i in range(max(len(a), len(b))):
-            items += ([a[i]] if i < len(a) else []) + ([b[i]] if i < len(b) else [])
-        items = items[:limit]
+    # Her istekte farklı ürünler, karışık sırayla (dönüşümlü gösterim).
+    items = basinca_ads.rotating_ads(db, fast_radar, tur, limit)
     return JSONResponse(
         {"ok": True, "uretildi": datetime.now().isoformat(timespec="seconds"), "gorsel_olcu": "900x1200 (3:4 dikey)", "items": items},
-        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=600"},
+        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "no-store"},
+    )
+
+
+@app.get("/reklam/basinca.js")
+def serve_basinca_reklam_js():
+    """basinca.com'a yapıştırılan canlı reklam kodu: ürünü ve fiyatları her açılışta dipci.tr'den çeker."""
+    return FileResponse(
+        STATIC_DIR / "basinca-reklam.js",
+        media_type="application/javascript; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=300", "Access-Control-Allow-Origin": "*"},
+    )
+
+
+@app.get("/reklam/basinca-ornek", response_class=HTMLResponse)
+def serve_basinca_reklam_ornek():
+    """8 reklam kodunun canlı önizlemesi (basınca kart ölçüsü, 3:4 dikey)."""
+    import basinca_ads
+    kartlar = "".join(
+        f'<figure><div class="dipci-reklam" data-tur="{k}"></div><figcaption><b>{v[0]}</b><br>'
+        f'<code>&lt;div class="dipci-reklam" data-tur="{k}"&gt;&lt;/div&gt;</code></figcaption></figure>'
+        for k, v in basinca_ads.KINDS.items()
+    )
+    html = (
+        '<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>dipci.tr reklam kodları | basinca.com</title><style>"
+        "body{margin:0;background:#0A0F1A;color:#E2E8F0;font-family:Arial,sans-serif;padding:24px}"
+        "h1{font-size:20px}p{color:#94A3B8;font-size:14px}"
+        ".izgara{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:20px}"
+        "figure{margin:0}figcaption{font-size:12px;color:#94A3B8;margin-top:8px;line-height:1.6}figcaption b{color:#F8FAFC}"
+        "code{color:#FACC15;font-size:11px}pre{background:#111827;padding:12px;border-radius:8px;color:#FACC15;overflow:auto}"
+        "</style></head><body><h1>dipci.tr → basinca.com canlı reklam kodları (8 kod)</h1>"
+        "<p>Her kart açılışta dipci.tr'den güncel ürünü ve fiyatları çeker; sayfayı yenileyince farklı ürün gelir.</p>"
+        '<pre>&lt;div class="dipci-reklam" data-tur="sok"&gt;&lt;/div&gt;<br>&lt;script src="https://dipci.tr/reklam/basinca.js" async&gt;&lt;/script&gt;</pre>'
+        f'<div class="izgara">{kartlar}</div><script src="/reklam/basinca.js" async></script></body></html>'
+    )
+    return HTMLResponse(html, headers=NO_CACHE_HTML_HEADERS)
+
+
+@app.get("/api/basinca/reklam-kodlari")
+def api_basinca_reklam_kodlari():
+    import basinca_ads
+    return JSONResponse(
+        {
+            "ok": True,
+            "gorsel_olcu": "900x1200 (3:4 dikey)",
+            "kodlar": [
+                {"kod": k, "etiket": v[0], "aciklama": v[1], "akis": f"https://dipci.tr/api/basinca/reklamlar?tur={k}&limit=12"}
+                for k, v in basinca_ads.KINDS.items()
+            ],
+        },
+        headers={"Access-Control-Allow-Origin": "*"},
     )
 
 
 @app.get("/reklam/basinca/{tur}/{product_key}.png")
 def serve_basinca_reklam_gorseli(tur: str, product_key: str):
     import basinca_ads
-    if tur not in ("dip", "kampanya") or len(product_key) > 160:
+    if tur not in basinca_ads.KINDS or len(product_key) > 160:
         raise HTTPException(status_code=404, detail="Bulunamadı")
     png = basinca_ads.render_card_png(db, fast_radar, tur, product_key)
     if not png:
