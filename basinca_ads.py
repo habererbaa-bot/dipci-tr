@@ -245,7 +245,7 @@ def list_ads(db, fast_radar=None, kind: str = "dip", limit: int = 12, exclude: O
                 "ozet": ev["ozet"],
                 "rozet": ev["badge"],
                 "urun_gorseli": r["image_url"],
-                "gorsel": f"{CANONICAL}/reklam/basinca/{kind}/{r['product_key']}.png?v={datetime.now():%Y%m%d%H}",
+                "gorsel": f"{CANONICAL}/reklam/basinca/{kind}/{r['product_key']}.png?v=k3-{datetime.now():%Y%m%d%H%M}"[:-1],  # 10 dakikada bir yeni adres: basınca eski görseli önbellekte tutmasın
                 "link": _product_link(r["product_key"], kind),
                 "en_ucuz": {"magaza": BRANDS.get(best["platform"], DEFAULT_BRAND)[0], "fiyat": best["pack_price"]},
                 "magazalar": [
