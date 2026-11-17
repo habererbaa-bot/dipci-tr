@@ -575,7 +575,7 @@ def api_basinca_reklamlar(tur: str = "karisik", limit: int = 12):
             items += ([a[i]] if i < len(a) else []) + ([b[i]] if i < len(b) else [])
         items = items[:limit]
     return JSONResponse(
-        {"ok": True, "uretildi": datetime.now().isoformat(timespec="seconds"), "gorsel_olcu": "1200x900 (4:3)", "items": items},
+        {"ok": True, "uretildi": datetime.now().isoformat(timespec="seconds"), "gorsel_olcu": "900x1200 (3:4 dikey)", "items": items},
         headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=600"},
     )
 
