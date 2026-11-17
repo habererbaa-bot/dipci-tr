@@ -387,98 +387,86 @@ def render_card_png(db, fast_radar, kind: str, product_key: str) -> Optional[byt
     if not pic:
         return None
 
-    # basınca kart düzeni (1152x1536 çizilir, 900x1200'e küçültülür):
-    # üstte görsel alanı, kırmızı çizgi, koyu lacivert alt blok, kırmızı etiket, Anton manşet, sarı geçişli satır.
+    # dipci.tr kurumsal kart (Kemal, 17 Kas 2026: "gazete manşeti gibi değil, kurumsal kimliğine göre; fiyat öne çıksın").
+    # Beyaz zemin, üstte lacivert dipci şeridi, ürün görseli, ürün adı ve büyük fiyat satırları.
+    def P(v):
+        return int(round(v * S))
+
+    def F(size, bold=True):
+        return _font(P(size), bold)
+
     img = Image.new("RGB", (RW, RH), "#FFFFFF")
     dr = ImageDraw.Draw(img)
-    M = 56
-    photo_h = 760
+    M = 40
 
-    # Görsel: üst alanı beyaz zeminiyle kaplar, ürün büyük ve ortada; arada katman yok.
-    bw, bh = RW - 2 * M, photo_h - 120
+    # Üst şerit: dipci.tr + reklam türü
+    dr.rectangle([0, 0, RW, P(88)], fill="#0B132B")
+    lf = F(38)
+    dr.text((P(M), P(20)), "dipci", font=lf, fill="#FFFFFF")
+    dr.text((P(M) + dr.textlength("dipci", font=lf), P(20)), ".tr", font=lf, fill="#10B981")
+    tag = KINDS[kind][0]
+    tf = F(20)
+    tw = dr.textlength(tag, font=tf)
+    dr.rounded_rectangle([P(W - M) - tw - P(32), P(24), P(W - M), P(64)], radius=P(20), fill="#10B981")
+    dr.text((P(W - M) - tw - P(16), P(32)), tag, font=tf, fill="#FFFFFF")
+
+    # Ürün görseli
+    box = (P(M), P(108), P(W - M), P(520))
+    bw, bh = box[2] - box[0], box[3] - box[1]
     sc = min(bw / pic.width, bh / pic.height)
     pic = pic.resize((max(1, int(pic.width * sc)), max(1, int(pic.height * sc))), Image.LANCZOS)
-    img.paste(pic, ((RW - pic.width) // 2, 60 + (bh - pic.height) // 2))
-
-    # Sağ üst: dipci.tr imi
-    lf = _cfont("Anton", 52)
-    lw = dr.textlength("dipci.tr", font=lf)
-    dr.rounded_rectangle([RW - M - lw - 36, 34, RW - M, 112], radius=18, fill="#0B132B")
-    dr.text((RW - M - lw - 18, 40), "dipci", font=lf, fill="#FFFFFF")
-    dr.text((RW - M - 18 - dr.textlength(".tr", font=lf), 40), ".tr", font=lf, fill="#10B981")
-    # Sol üst: rozet (indirim yüzdesi ya da fark)
+    img.paste(pic, (box[0] + (bw - pic.width) // 2, box[1] + (bh - pic.height) // 2))
     badge = ev["badge"]
     if badge:
-        bf = _cfont("Anton", 72)
+        bf = F(34)
         bw2 = dr.textlength(badge, font=bf)
-        dr.rounded_rectangle([M, 34, M + bw2 + 48, 146], radius=18, fill="#16A34A")
-        dr.text((M + 24, 40), badge, font=bf, fill="#FFFFFF")
+        dr.rounded_rectangle([box[0], box[1], box[0] + bw2 + P(32), box[1] + P(58)], radius=P(12), fill="#059669")
+        dr.text((box[0] + P(16), box[1] + P(10)), badge, font=bf, fill="#FFFFFF")
 
-    # Kırmızı çizgi + koyu blok
-    dr.rectangle([0, photo_h, RW, photo_h + 8], fill="#E11D2A")
-    dr.rectangle([0, photo_h + 8, RW, RH], fill="#121826")
+    # Ürün adı
+    y = P(544)
+    dr.text((P(M), y), (r["brand"] or "").upper()[:34], font=F(22), fill="#64748B")
+    y += P(34)
+    nf = F(34)
+    for line in _wrap(dr, r["family_name"] or "", nf, P(W - 2 * M), 2):
+        dr.text((P(M), y), line, font=nf, fill="#0F172A")
+        y += P(44)
+    y += P(12)
 
-    y = photo_h + 56
-    tag = KINDS[kind][0] + " · REKLAM"
-    tf = _cfont("Oswald", 40, "Bold")
-    tw = dr.textlength(tag, font=tf)
-    dr.rounded_rectangle([M, y, M + tw + 56, y + 76], radius=10, fill="#E11D2A")
-    dr.text((M + 28, y + 10), tag, font=tf, fill="#FFFFFF")
-    y += 104
-
-    title = _tr_upper(f"{r['brand']} {r['family_name']}".strip())
-    # Mağaza satırlarının yeri önceden ayrılır; manşet kalan alana göre küçülür.
-    n_rows = (min(len(quotes), 5) + 1) // 2
-    rows_top = RH - 40 - n_rows * 82
-
-    def cap(f):  # büyük harf yüksekliği ve üst boşluk (Anton'un geniş satır aralığını atla)
-        _, t, _, b = f.getbbox("ŞİĞÜ0")
-        top = f.getbbox("H")[1]
-        return top, b - top
-
-    pf = _cfont("Anton", 96)
-    p_top, p_h = cap(pf)
-    price_block = p_h + 34
-    head_space = rows_top - price_block - y - 10
-    size = 118
-    while True:
-        hf, lines = _fit_lines(dr, title, "Anton", RW - 2 * M, 2, size, 56)
-        h_top, h_h = cap(hf)
-        lh = int(h_h * 1.22)
-        if len(lines) * lh <= head_space or hf.size <= 56:
-            break
-        size = hf.size - 6
-    for line in lines:
-        dr.text((M, y - h_top), line, font=hf, fill="#F8FAFC")
-        y += lh
-    y += 14
-
-    best = quotes[0]
-    price_line = f"EN UCUZ {_tl(best['pack_price'])}"
-    _gradient_text(img, (M, y - p_top), price_line, pf)
-    y += price_block
-
-    # Mağaza sıralaması: iki sütun, kurumsal renkli etiket + fiyat
-    rest = quotes[:5]
-    cols = 2
-    col_w = (RW - 2 * M - 24) // cols
-    row_h = 70
-    y = max(y, rows_top)  # satırlar kartın dibine sabit; hepsi görünür
-    cf = _cfont("Oswald", 32, "Bold")
-    for i, q in enumerate(rest):
+    # Fiyat satırları (3-5 mağaza), alt şeride kadar sığdırılır
+    footer_top = P(H - 84)
+    n = min(len(quotes), 5)
+    gap = P(10)
+    row_h = min(P(84), (footer_top - P(16) - y - gap * (n - 1)) // n)
+    for i, q in enumerate(quotes[:n]):
         name, bg, fg = BRANDS.get(q["platform"], DEFAULT_BRAND)
-        cx = M + (i % cols) * (col_w + 24)
-        cy = y + (i // cols) * (row_h + 12)
+        top = y + i * (row_h + gap)
         win = i == 0
-        dr.rounded_rectangle([cx, cy, cx + col_w, cy + row_h], radius=12,
-                             fill="#1E2A3D" if not win else "#14321F",
-                             outline="#FACC15" if win else "#2B3A52", width=3)
-        nw = dr.textlength(name, font=cf) + 28
-        dr.rounded_rectangle([cx + 10, cy + 10, cx + 10 + nw, cy + row_h - 10], radius=8, fill=bg)
-        dr.text((cx + 24, cy + 13), name, font=cf, fill=fg)
+        dr.rounded_rectangle([P(M), top, P(W - M), top + row_h], radius=P(14),
+                             fill="#ECFDF5" if win else "#F8FAFC",
+                             outline="#10B981" if win else "#E2E8F0", width=P(3) if win else P(2))
+        cf = F(24)
+        cw = dr.textlength(name, font=cf) + P(28)
+        ch = min(P(44), row_h - P(16))
+        cy = top + (row_h - ch) // 2
+        dr.rounded_rectangle([P(M + 14), cy, P(M + 14) + cw, cy + ch], radius=P(10), fill=bg)
+        dr.text((P(M + 28), cy + (ch - P(26)) // 2), name, font=cf, fill=fg)
         ps = _tl(q["pack_price"])
-        dr.text((cx + col_w - 16 - dr.textlength(ps, font=cf), cy + 13), ps, font=cf,
-                fill="#FACC15" if win else "#E2E8F0")
+        pf = F(40 if win else 32)
+        ph = P(46 if win else 37)
+        px = P(W - M - 18) - dr.textlength(ps, font=pf)
+        dr.text((px, top + (row_h - ph) // 2), ps, font=pf, fill="#047857" if win else "#334155")
+        if win:
+            lbl, lf2 = "EN UCUZ", F(18)
+            lx = P(M + 14) + cw + P(12)
+            if lx + dr.textlength(lbl, font=lf2) < px - P(10):
+                dr.text((lx, top + (row_h - P(21)) // 2), lbl, font=lf2, fill="#059669")
+
+    # Alt şerit
+    dr.rectangle([0, footer_top, RW, RH], fill="#F1F5F9")
+    cf2 = F(28)
+    dr.text((P(M), footer_top + P(26)), "Tüm fiyatları karşılaştır →", font=cf2, fill="#0B132B")
+    dr.text((P(W - M) - dr.textlength("dipci.tr", font=cf2), footer_top + P(26)), "dipci.tr", font=cf2, fill="#059669")
 
     img = img.resize((W, H), Image.LANCZOS)
     buf = io.BytesIO()
