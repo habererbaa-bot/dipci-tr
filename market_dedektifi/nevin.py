@@ -229,7 +229,7 @@ def basincaya_gonder(cikti: dict, kaynak_id: str) -> str:
     anahtar = os.getenv("DEDEKTIF_YAYIN_ANAHTARI", "").strip()
     if not adres or not anahtar:
         return "yayin-adresi-yok"
-    duz = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"", cikti["markdown"])
+    duz = re.sub(r"\[([^\]]+)\]\([^)]+\)", lambda m: m.group(1), cikti["markdown"])
     govde = json.dumps({
         "baslik": cikti["baslik"], "spot": cikti["ozet_spot"], "html": cikti["html"], "metin": duz,
         "tarih": cikti["uretim_zamani"], "kaynak_id": kaynak_id, "yazar": cikti["yazar"],
