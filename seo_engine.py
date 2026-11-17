@@ -354,7 +354,8 @@ def render_seo_hydrated_spa(
   <link rel="canonical" href="{esc_canon}" />
   <link rel="alternate" hreflang="tr-TR" href="{esc_canon}" />
   <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg" />
-  <link rel="apple-touch-icon" href="/static/brand/favicon.svg" />
+  <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png" />
   <link rel="manifest" href="/static/manifest.json" />
   <meta name="theme-color" content="#0B132B" />
 

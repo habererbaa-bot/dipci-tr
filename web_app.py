@@ -850,7 +850,7 @@ def serve_corporate_page():
 
 @app.get("/favicon.ico")
 def serve_favicon():
-    return FileResponse(str(STATIC_DIR / "brand" / "favicon.svg"), media_type="image/svg+xml")
+    return FileResponse(str(STATIC_DIR / "brand" / "favicon-32.png"), media_type="image/png")
 
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
