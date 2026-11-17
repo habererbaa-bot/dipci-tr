@@ -997,6 +997,18 @@ class DipciLensEngine:
             stripped_q = re.sub(r"\b\d+(?:[\.,]\d+)?\s*(?:kg|gr|g|ml|lt|l|adet)\b", "", query, flags=re.I).strip()
             if stripped_q and stripped_q.lower() != query.lower() and len(stripped_q) >= 3:
                 queries_to_try.append(stripped_q)
+            # Fotoğraftan gelen uzun adlar ("SEK Çiftlik tam yağlı pastörize taze süt") marketfiyati'nda boş dönüyor (Kemal, 17 Kas 2026):
+            # kelime sayısını adım adım azaltarak yeniden dene.
+            base_words = (stripped_q or query).split()
+            for n in (4, 3, 2):
+                if len(base_words) > n:
+                    cand_q = " ".join(base_words[:n])
+                    if cand_q.lower() not in [x.lower() for x in queries_to_try]:
+                        queries_to_try.append(cand_q)
+            if len(base_words) >= 3:
+                cand_q = f"{base_words[0]} {base_words[-1]}"
+                if cand_q.lower() not in [x.lower() for x in queries_to_try]:
+                    queries_to_try.append(cand_q)
 
             for q_try in queries_to_try:
                 try:
