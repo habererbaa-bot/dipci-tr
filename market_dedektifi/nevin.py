@@ -5,7 +5,7 @@ Tarif MTR1'deki src/yazar/marketDedektifi.ts ile aynı: içten, "Dostlar" diye s
 bir kadın; madde listesi, tablo, başlıklı bölüm yok; düz bir köşe yazısı. Fark: rakamlar dipci.tr'nin kendi
 verisinden gelir ve önerdiği ürünlerin adı yazının içinde dipci.tr sayfasına küçük, doğal bir bağlantı olur.
 
-Model: yalnız ÜCRETSİZ Gemini anahtarı (GEMINI_UCRETSIZ_KEY). Ücretli anahtara düşmez; cevap yoksa o gün yazı yok.
+Model: Coarena DeepSeek v4.1 flash (Kemal, 17 Kas); dolu ise Coarena'nın diğerleri, son çare ücretsiz Gemini.
 Çıktı: /opt/dipci/data/dedektif/<zaman>.json  → https://dipci.tr/api/dedektif/gunun-yazisi
 """
 import html
@@ -73,19 +73,20 @@ def urunleri_topla():
 
 
 def gemini(sistem: str, soru: str) -> str:
+    """Yazıyı Coarena yazar (Kemal, 17 Kas 2026: "dipci coarena ile yazdır"): önce DeepSeek v4.1 flash,
+    sonra Coarena'nın diğer modelleri; hepsi doluysa son çare ücretsiz Gemini."""
     son = None
-    for m in MODELLER:
-        try:
-            return _gemini(m, sistem, soru)
-        except Exception as e:
-            son = e
-    # Yedek: dipci'nin fotoğraf aramasında zaten kullandığı ÜCRETSİZ Coarena modelleri.
     for m in ("deepseek-v4-1-flash-1017", "gemini-3-8-flash", "gpt-6-luna"):
         try:
             return _coarena(m, sistem, soru)
         except Exception as e:
             son = e
-    raise RuntimeError(f"Ücretsiz modellerin hepsi dolu: {son}")
+    for m in MODELLER:
+        try:
+            return _gemini(m, sistem, soru)
+        except Exception as e:
+            son = e
+    raise RuntimeError(f"Modellerin hepsi dolu: {son}")
 
 
 def _coarena(model: str, sistem: str, soru: str) -> str:
@@ -211,7 +212,7 @@ def main() -> int:
         "ozet_spot": y.get("spot", "").strip(),
         "html": govde,
         "markdown": y["metin"],
-        "kullanilan_motor": "gemini-ucretsiz",
+        "kullanilan_motor": "coarena",
         "urunler": urunler,
     }
     CIKTI.mkdir(parents=True, exist_ok=True)
