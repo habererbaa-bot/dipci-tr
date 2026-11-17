@@ -87,7 +87,7 @@ def build_organization_and_website_schema() -> List[Dict]:
             "url": CANONICAL_ORIGIN,
             "logo": {
                 "@type": "ImageObject",
-                "url": f"{CANONICAL_ORIGIN}/static/brand/logo-light.svg?v=7",
+                "url": f"{CANONICAL_ORIGIN}/static/brand/logo-light.svg?v=8",
                 "width": 260,
                 "height": 64,
             },
@@ -597,7 +597,7 @@ def build_corporate_identity_html() -> str:
   <header class="bg-white border-b border-slate-200">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3">
-        <img src="/static/brand/logo-light.svg?v=7" alt="dipci.tr Logo" class="h-8 w-auto" />
+        <img src="/static/brand/logo-light.svg?v=8" alt="dipci.tr Logo" class="h-8 w-auto" />
       </a>
       <a href="/" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition">
         ← Ana Sayfaya Dön
@@ -620,11 +620,11 @@ def build_corporate_identity_html() -> str:
       <h2 class="text-base font-semibold text-slate-900">Logo ve Kurumsal Renk Standartları</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center gap-2">
-          <img src="/static/brand/logo-light.svg?v=7" alt="dipci.tr Açık Zemin Logo" class="h-10" />
+          <img src="/static/brand/logo-light.svg?v=8" alt="dipci.tr Açık Zemin Logo" class="h-10" />
           <span class="text-xs text-slate-500">Açık Zemin Resmi Logo (SVG)</span>
         </div>
         <div class="p-5 rounded-xl bg-[#0F172A] flex flex-col items-center justify-center gap-2">
-          <img src="/static/brand/logo-dark.svg?v=7" alt="dipci.tr Koyu Zemin Logo" class="h-10" />
+          <img src="/static/brand/logo-dark.svg?v=8" alt="dipci.tr Koyu Zemin Logo" class="h-10" />
           <span class="text-xs text-slate-400">Koyu Zemin Resmi Logo (SVG)</span>
         </div>
       </div>
@@ -753,7 +753,7 @@ def build_legal_page_html(slug: str) -> str:
   </style>
 </head>
 <body>
-  <header><div class="w"><a href="/"><img src="/static/brand/logo-light.svg?v=7" alt="dipci.tr" style="height:32px" /></a></div></header>
+  <header><div class="w"><a href="/"><img src="/static/brand/logo-light.svg?v=8" alt="dipci.tr" style="height:32px" /></a></div></header>
   <div class="w"><main><h1>{title}</h1>{body}<p style="color:#64748b;font-size:13px;margin-top:24px">Son güncelleme: 17 Kasım 2026</p></main></div>
   <footer class="w"><a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/kurumsal">Kurumsal</a></footer>
 </body>
