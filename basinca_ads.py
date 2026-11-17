@@ -221,13 +221,15 @@ def evaluate(db, kind: str, r) -> Optional[Dict]:
     return {"quotes": quotes, "badge": badge, "ozet": ozet}
 
 
-def list_ads(db, fast_radar=None, kind: str = "dip", limit: int = 12) -> List[Dict]:
+def list_ads(db, fast_radar=None, kind: str = "dip", limit: int = 12, exclude: Optional[set] = None) -> List[Dict]:
     """basınca akışına konacak reklam kayıtları. En az 3 mağazada satılan, görseli açılan ürünler."""
     if kind not in KINDS:
         return []
     limit = max(1, min(int(limit or 12), 40))
     items = []
     for r in _candidates(db, kind):
+        if exclude and r["product_key"] in exclude:
+            continue
         ev = evaluate(db, kind, r)
         if not ev or not _image_ok(r["image_url"]):
             continue
@@ -486,39 +488,56 @@ _pool: Dict[str, tuple] = {}
 _refreshing: set = set()
 
 
+# Aynı ürün iki karta birden düşmesin: önce şok, sonra diğerleri; bir türe giren ürün sonrakilere girmez.
+POOL_ORDER = ("sok", "dip", "fark", "indirim-marketi", "kampanya", "amazon", "temizlik-bakim", "teknoloji-ev")
+_pool_lock = threading.Lock()
+
+
+def _build_all_pools(db) -> None:
+    used: set = set()
+    yeni = {}
+    for k in POOL_ORDER:
+        items = list_ads(db, None, k, 30, exclude=used)
+        for it in items:
+            used.add(it["id"][len(f"dipci-{k}-"):])
+        yeni[k] = (time.time(), items)
+    _pool.update(yeni)
+
+
 def warm_pools(db) -> None:
     """Site açılınca 8 kodun havuzunu arka planda hazırla."""
     def _run():
-        for k in KINDS:
+        with _pool_lock:
             try:
-                _pool[k] = (time.time(), list_ads(db, None, k, 40))
+                _build_all_pools(db)
             except Exception:
                 pass
     threading.Thread(target=_run, daemon=True).start()
-POOL_SECONDS = 900
 
 
 def rotating_ads(db, fast_radar, kind: str, limit: int) -> List[Dict]:
     """Her istekte havuzdan rastgele, farklı ürünler. Havuz 15 dakikada bir tazelenir."""
     kinds = tuple(KINDS) if kind not in KINDS else (kind,)
+    oldest = min((_pool[k][0] for k in KINDS if k in _pool), default=0)
+    if len(_pool) < len(KINDS):
+        with _pool_lock:
+            if len(_pool) < len(KINDS):
+                _build_all_pools(db)
+    elif time.time() - oldest > POOL_SECONDS and not _refreshing:
+        # Eski havuzu hemen ver, yenisini arka planda hazırla (okur beklemesin).
+        _refreshing.add("hepsi")
+
+        def _yenile():
+            try:
+                with _pool_lock:
+                    _build_all_pools(db)
+            finally:
+                _refreshing.discard("hepsi")
+
+        threading.Thread(target=_yenile, daemon=True).start()
     picked = []
     for k in kinds:
-        hit = _pool.get(k)
-        if not hit:
-            hit = (time.time(), list_ads(db, fast_radar, k, 40))
-            _pool[k] = hit
-        elif time.time() - hit[0] > POOL_SECONDS and k not in _refreshing:
-            # Eski havuzu hemen ver, yenisini arka planda hazırla (okur beklemesin).
-            _refreshing.add(k)
-
-            def _yenile(kk=k):
-                try:
-                    _pool[kk] = (time.time(), list_ads(db, fast_radar, kk, 40))
-                finally:
-                    _refreshing.discard(kk)
-
-            threading.Thread(target=_yenile, daemon=True).start()
-        items = list(hit[1])
+        items = list(_pool.get(k, (0, []))[1])
         random.shuffle(items)
         picked.append(items)
     out = []

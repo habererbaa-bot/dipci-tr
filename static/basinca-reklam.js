@@ -75,7 +75,7 @@
       '<div class="lg">dipci<b>.tr</b></div>' +
       '<img src="' + esc(it.urun_gorseli) + '" alt="' + esc(it.baslik) + '" loading="lazy"></div>' +
       '<div class="c"></div><div class="a">' +
-      '<div class="e">' + esc(it.etiket) + " · Reklam</div>" +
+      '<div class="e">' + esc(it.etiket) + "</div>" +
       '<div class="b">' + esc(it.baslik) + "</div>" +
       '<div class="f">En ucuz ' + tl(it.en_ucuz && it.en_ucuz.fiyat) + "</div>" +
       '<div class="m">' + m + "</div></div></a>";
