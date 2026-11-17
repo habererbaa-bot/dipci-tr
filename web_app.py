@@ -553,6 +553,38 @@ def serve_lens_seo_page():
     )
 
 
+@app.get("/api/basinca/reklamlar")
+def api_basinca_reklamlar(tur: str = "karisik", limit: int = 12):
+    """basinca.com akışı için dipci.tr reklamları (Kemal, 17 Kas 2026).
+    tur: dip (gerçek indirimler) | kampanya (online'da en ucuz) | karisik (ikisi sırayla)."""
+    import basinca_ads
+    limit = max(1, min(int(limit or 12), 40))
+    if tur in ("dip", "kampanya"):
+        items = basinca_ads.list_ads(db, fast_radar, tur, limit)
+    else:
+        a = basinca_ads.list_ads(db, fast_radar, "dip", limit)
+        b = basinca_ads.list_ads(db, fast_radar, "kampanya", limit)
+        items = []
+        for i in range(max(len(a), len(b))):
+            items += ([a[i]] if i < len(a) else []) + ([b[i]] if i < len(b) else [])
+        items = items[:limit]
+    return JSONResponse(
+        {"ok": True, "uretildi": datetime.now().isoformat(timespec="seconds"), "gorsel_olcu": "1200x900 (4:3)", "items": items},
+        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=600"},
+    )
+
+
+@app.get("/reklam/basinca/{tur}/{product_key}.png")
+def serve_basinca_reklam_gorseli(tur: str, product_key: str):
+    import basinca_ads
+    if tur not in ("dip", "kampanya") or len(product_key) > 160:
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    png = basinca_ads.render_card_png(db, fast_radar, tur, product_key)
+    if not png:
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "public, max-age=1800", "Access-Control-Allow-Origin": "*"})
+
+
 @app.get("/gizlilik", response_class=HTMLResponse)
 def serve_privacy_page():
     from seo_engine import build_legal_page_html
