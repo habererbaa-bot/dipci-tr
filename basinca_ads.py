@@ -262,7 +262,7 @@ def list_ads(db, fast_radar=None, kind: str = "dip", limit: int = 12, exclude: O
 
 _img_cache: Dict[str, tuple] = {}
 _img_lock = threading.Lock()
-CACHE_SECONDS = 1800
+CACHE_SECONDS = 3600
 
 
 def _fetch_image(url: str) -> Optional[Image.Image]:
@@ -564,6 +564,13 @@ def _build_all_pools(db) -> None:
     _acil_isaretle(db, yeni)
     t = time.time()
     _pool.update({k: (t, v) for k, v in yeni.items()})
+    # Kart görsellerini önceden çiz: okur kutuyu açınca beklemesin.
+    for k, items in yeni.items():
+        for it in items:
+            try:
+                render_card_png(db, None, k, it["id"][len(f"dipci-{k}-"):])
+            except Exception:
+                pass
 
 
 def warm_pools(db) -> None:
