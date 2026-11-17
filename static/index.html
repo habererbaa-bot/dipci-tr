@@ -557,7 +557,7 @@
       summary: { total_products: 0, catalog_total_products: 0, total_live_quotes: 0, active_stores_count: 17, max_savings_pct: 0, real_drops_count: 0 },
       selectedCategory: "",
       searchQuery: "",
-      vitrinSort: "savings",
+      vitrinSort: "ihtiyac",
       filterBrand: "",
       filterStore: "",
       filterMinPrice: "",
@@ -958,7 +958,7 @@
       appState.filterMaxPrice = "";
       appState.filterOnlyDrops = false;
       appState.filterMinStores = 0;
-      appState.vitrinSort = "savings";
+      appState.vitrinSort = "ihtiyac";
       appState.vitrinPage = 1;
       await loadProducts("", "", false, false);
       renderCurrentView();
@@ -1313,10 +1313,25 @@
 
     // ----------------- Yardımcı Görsel Bileşenler -----------------
 
-    function scrollRadarStrip(dir) {
+    function scrollRadarStrip(dir, auto) {
       const el = document.getElementById("radar-strip");
-      if (el) el.scrollBy({ left: dir * el.clientWidth, behavior: "smooth" });
+      if (!el) return;
+      if (!auto) radarStripTouched();
+      const card = el.firstElementChild;
+      const step = card ? card.getBoundingClientRect().width + 12 : el.clientWidth;
+      const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 8;
+      if (dir > 0 && atEnd) el.scrollTo({ left: 0, behavior: "smooth" });
+      else el.scrollBy({ left: dir * (auto ? step : Math.max(step, el.clientWidth - step)), behavior: "smooth" });
     }
+
+    // İndirim şeridi kendiliğinden kayar; kullanıcı dokununca 15 sn durur (Kemal, 17 Kas 2026: "kaydırılabildiği bilinsin")
+    let radarStripPauseUntil = 0;
+    function radarStripTouched() { radarStripPauseUntil = Date.now() + 15000; }
+    setInterval(() => {
+      if (document.hidden || Date.now() < radarStripPauseUntil) return;
+      const el = document.getElementById("radar-strip");
+      if (el && el.scrollWidth > el.clientWidth + 8) scrollRadarStrip(1, true);
+    }, 4000);
 
     function renderProductThumb(imgUrl, brand, category, sizeCls = "w-14 h-14") {
       const initials = String(brand || "DP").trim().slice(0, 3).toUpperCase();
@@ -1442,30 +1457,31 @@
 
       const showRadarStrip = !appState.searchQuery && !appState.selectedCategory && !appState.filterOnlyDrops && (appState.liveDrops || []).length > 0;
       const radarStripHtml = showRadarStrip ? `
-        <section class="p-4 sm:p-5 rounded-2xl bg-white border border-emerald-200/90 space-y-3">
+        <section class="relative p-4 sm:p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-300 space-y-3">
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-2.5 min-w-0">
-              <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 shrink-0"></span>
-              <h2 class="text-sm font-semibold text-slate-900 whitespace-nowrap">Gerçek İndirimler</h2>
-              <span class="hidden sm:inline px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[11px] font-semibold">30 günlük ortalamanın altında</span>
+              <span class="relative flex w-3 h-3 shrink-0"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60"></span><span class="relative inline-flex w-3 h-3 rounded-full bg-emerald-600"></span></span>
+              <h2 class="text-base sm:text-lg font-bold text-slate-900 whitespace-nowrap">Gerçek İndirimler</h2>
+              <span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-xs font-bold num">${appState.liveDrops.length}</span>
+              <span class="hidden md:inline text-xs font-medium text-emerald-800">30 günlük ortalamanın altına inenler · canlı</span>
             </div>
-            <button onclick="switchMainView('deals')" class="text-xs font-semibold text-emerald-700 hover:text-emerald-900 whitespace-nowrap">
-              Tümü (${appState.liveDrops.length}) →
+            <button onclick="switchMainView('deals')" class="text-sm font-semibold text-emerald-700 hover:text-emerald-900 whitespace-nowrap">
+              Tümünü gör →
             </button>
           </div>
-          <div class="flex sm:hidden items-center justify-between gap-2 -mt-1">
-            <button type="button" aria-label="Önceki indirim" onclick="scrollRadarStrip(-1)" class="w-10 h-10 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 text-lg font-bold flex items-center justify-center active:bg-emerald-100">‹</button>
-            <span class="text-[11px] font-semibold text-emerald-800">← Sağa sola kaydırın →</span>
-            <button type="button" aria-label="Sonraki indirim" onclick="scrollRadarStrip(1)" class="w-10 h-10 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-800 text-lg font-bold flex items-center justify-center active:bg-emerald-100">›</button>
+          <div class="flex items-center justify-between gap-2">
+            <button type="button" aria-label="Önceki indirimler" onclick="scrollRadarStrip(-1)" class="w-11 h-11 rounded-full border-2 border-emerald-300 bg-white text-emerald-800 text-2xl font-bold flex items-center justify-center hover:bg-emerald-100 active:bg-emerald-100 shrink-0">‹</button>
+            <span class="text-xs sm:text-sm font-semibold text-emerald-800 text-center">👉 Parmağınızla sağa sola kaydırın, daha çok indirim var</span>
+            <button type="button" aria-label="Sonraki indirimler" onclick="scrollRadarStrip(1)" class="w-11 h-11 rounded-full border-2 border-emerald-300 bg-white text-emerald-800 text-2xl font-bold flex items-center justify-center hover:bg-emerald-100 active:bg-emerald-100 shrink-0">›</button>
           </div>
-          <div id="radar-strip" class="flex sm:grid sm:grid-cols-2 lg:grid-cols-4 gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory">
-            ${(appState.liveDrops || []).slice(0, 8).map((d, i) => {
+          <div id="radar-strip" onpointerdown="radarStripTouched()" onwheel="radarStripTouched()" class="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth pb-1">
+            ${(appState.liveDrops || []).slice(0, 24).map((d, i) => {
               const st = getBrandStyle(d.platform, true);
               const initials = String(d.brand || "DP").trim().slice(0, 3).toUpperCase();
               return `
                 <div
                   onclick="openProductXray('${d.product_key}')"
-                  class="${i >= 4 ? "sm:hidden " : ""}cursor-pointer w-full shrink-0 sm:w-auto snap-center rounded-xl bg-white hover:bg-emerald-50/30 border border-slate-200/80 hover:border-emerald-300 transition flex flex-col overflow-hidden"
+                  class="cursor-pointer w-[80%] sm:w-[calc(33.333%-0.5rem)] lg:w-[calc(25%-0.6rem)] xl:w-[calc(20%-0.6rem)] shrink-0 snap-start rounded-xl bg-white hover:bg-emerald-50/30 border border-slate-200/80 hover:border-emerald-300 transition flex flex-col overflow-hidden"
                 >
                   <div class="relative h-44 sm:h-36 bg-white border-b border-slate-100 flex items-center justify-center p-3">
                     ${d.image_url ? `
@@ -1768,6 +1784,7 @@
                 onchange="applyVitrinFilter({ vitrinSort: this.value })"
                 class="px-3 py-1.5 rounded-lg bg-white border border-slate-200 text-xs font-medium text-slate-700 outline-none focus:border-slate-900"
               >
+                <option value="ihtiyac" ${appState.vitrinSort === "ihtiyac" ? "selected" : ""}>Temel İhtiyaçlar Önce</option>
                 <option value="savings" ${appState.vitrinSort === "savings" ? "selected" : ""}>Fiyat Farkına Göre</option>
                 <option value="drops" ${appState.vitrinSort === "drops" ? "selected" : ""}>Gerçek İndirim Oranına Göre</option>
                 <option value="offers" ${appState.vitrinSort === "offers" ? "selected" : ""}>Mağaza Sayısına Göre</option>

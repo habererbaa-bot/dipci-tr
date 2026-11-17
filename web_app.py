@@ -70,6 +70,8 @@ STATIC_DIR = BASE_DIR / "static"
 STATIC_DIR.mkdir(exist_ok=True)
 
 db = PriceMemoryDB(DB_PATH)
+import talep as _talep
+_talep.kaydet(db.conn)  # ana sayfa ihtiyaç sıralaması (Kemal, 17 Kas 2026)
 affiliate_builder = AffiliateLinkBuilder(AFFILIATE_CONFIG)
 audit_engine = MarketDedektifiAuditEngine(db)
 scanner_engine = CameraScannerEngine(db, audit_engine, affiliate_builder)
@@ -950,7 +952,7 @@ def list_products(
     max_price: float = 0.0,
     only_drops: int = 0,
     min_stores: int = 0,
-    sort: str = "savings",
+    sort: str = "ihtiyac",
     page: int = 1,
     limit: int = 72,
     live: int = 0,
@@ -1019,6 +1021,8 @@ def list_products(
             ).fetchone()["c"]
 
     order_map = {
+        # Ana sayfa: çok alınan/aranan temel ihtiyaçlar önde, aynı gruptakiler 3 saatte bir yer değiştirir (Kemal, 17 Kas 2026)
+        "ihtiyac": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, dipci_talep(search_norm, category) / 10 DESC, dipci_karisim(product_key)",
         "savings": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, savings_pct DESC, offer_count DESC",
         "drops": "is_real_drop DESC, drop_vs_median_pct DESC, savings_pct DESC",
         "price_asc": "best_pack_price ASC, offer_count DESC",
@@ -1026,7 +1030,7 @@ def list_products(
         "offers": "offer_count DESC, savings_pct DESC",
         "score": "detective_score DESC, savings_pct DESC",
     }
-    order_sql = order_map.get(sort, order_map["savings"])
+    order_sql = order_map.get(sort, order_map["ihtiyac"])
 
     page_rows = db.conn.execute(
         f"""
@@ -1512,6 +1516,11 @@ def api_delete_alert(
 @app.get("/api/price-drops")
 def api_list_price_drops(category: str = "", limit: int = 48, min_drop_pct: float = 10.0):
     drops = fast_radar.list_live_drops(category=category, limit=limit, min_drop_pct=min_drop_pct)
+    # Şeritte önce çok alınan ürünlerin indirimi, sonra indirim oranı (Kemal, 17 Kas 2026)
+    drops.sort(key=lambda d: (
+        -(_talep.puan(_norm_search_tr(f"{d.get('brand','')} {d.get('family_name','')}"), d.get("category", "")) >= 80),
+        -float(d.get("drop_pct") or 0),
+    ))
     return {
         "ok": True,
         "count": len(drops),
