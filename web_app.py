@@ -1022,7 +1022,7 @@ def list_products(
 
     order_map = {
         # Ana sayfa: çok alınan/aranan temel ihtiyaçlar önde, aynı gruptakiler 3 saatte bir yer değiştirir (Kemal, 17 Kas 2026)
-        "ihtiyac": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, dipci_talep(search_norm, category) / 10 DESC, dipci_karisim(product_key)",
+        "ihtiyac": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, CASE WHEN COALESCE(image_url, '') <> '' THEN 1 ELSE 0 END DESC, dipci_talep(search_norm, category) / 10 DESC, dipci_karisim(product_key)",
         "savings": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, savings_pct DESC, offer_count DESC",
         "drops": "is_real_drop DESC, drop_vs_median_pct DESC, savings_pct DESC",
         "price_asc": "best_pack_price ASC, offer_count DESC",

@@ -1477,7 +1477,7 @@
             <button type="button" aria-label="Sonraki indirimler" onclick="scrollRadarStrip(1)" class="w-11 h-11 rounded-full border-2 border-emerald-300 bg-white text-emerald-800 text-2xl font-bold flex items-center justify-center hover:bg-emerald-100 active:bg-emerald-100 shrink-0">›</button>
           </div>
           <div id="radar-strip" onpointerdown="radarStripTouched()" onwheel="radarStripTouched()" class="flex gap-3 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth pb-1">
-            ${(appState.liveDrops || []).slice(0, 24).map((d, i) => {
+            ${(appState.liveDrops || []).filter(d => d.image_url).slice(0, 24).map((d, i) => {
               const st = getBrandStyle(d.platform, true);
               const initials = String(d.brand || "DP").trim().slice(0, 3).toUpperCase();
               return `
