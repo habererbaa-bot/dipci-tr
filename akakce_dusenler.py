@@ -58,6 +58,23 @@ def dusenler(sayfa: int):
     return out
 
 
+def dipci_kategori(slug: str) -> str:
+    """Akakçe kategori adresinden dipci kategorisi (dipci'nin sınıflayıcısı teknolojiyi bazen 'gıda' sanıyordu)."""
+    s = slug.lower()
+    kurallar = [
+        ("kisisel_bakim", ("sac", "epilasyon", "tiras", "dis-fircasi", "parfum", "makyaj", "cilt", "deodorant")),
+        ("saglik_spor_outdoor", ("ayakkabi", "spor", "bisiklet", "kosu", "outdoor", "kamp", "fitness", "tansiyon")),
+        ("anne_bebek", ("bebek", "cocuk-arac", "mama-sandalye", "puset")),
+        ("evcil_hayvan", ("kedi", "kopek", "evcil")),
+        ("ev_yasam_mutfak", ("kahve-makinesi", "blender", "mutfak", "tencere", "fritoz", "airfryer", "tava", "nevresim",
+                             "yatak", "mobilya", "aydinlatma", "soba", "isitici", "ütü", "utu")),
+    ]
+    for kat, anahtarlar in kurallar:
+        if any(k in s for k in anahtarlar):
+            return kat
+    return "teknoloji_beyaz_esya"
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sayfa", type=int, default=8)
@@ -87,6 +104,10 @@ def main() -> None:
         time.sleep(6)
         if not pk:
             continue
+        kat = dipci_kategori(u["kategori"])
+        db.conn.execute("UPDATE canonical_products SET category = ? WHERE product_key = ?", (kat, pk))
+        db.conn.execute("UPDATE product_catalog_index SET category = ? WHERE product_key = ?", (kat, pk))
+        db.conn.commit()
         r = db.conn.execute("SELECT * FROM product_catalog_index WHERE product_key = ?", (pk,)).fetchone()
         if not r or int(r["offer_count"] or 0) < 2:
             continue
