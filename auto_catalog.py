@@ -675,7 +675,12 @@ ALL_VALID_CATEGORIES: Set[str] = {
     "saglik_spor_outdoor",
 }
 
+DIPCI_KATEGORILERI = {"gida", "temizlik", "kisisel_bakim", "anne_bebek", "teknoloji_beyaz_esya", "ev_yasam_mutfak",
+                      "evcil_hayvan", "saglik_spor_outdoor", "yapi_oto_bahce", "giyim_aksesuar"}
+
 UNITLESS_ITEM_CATEGORIES: Set[str] = {
+    "yapi_oto_bahce",
+    "giyim_aksesuar",
     "teknoloji_beyaz_esya",
     "ev_yasam_mutfak",
     "saglik_spor_outdoor",
@@ -695,6 +700,9 @@ EXTRA_KNOWN_BRANDS: Set[str] = {
 
 
 def classify_category(text: str, hint: str = "") -> str:
+    # Kaynak kategoriyi kesin biliyorsa (Akakçe kategori ağacı, 17 Kas 2026) onu kullan
+    if hint in DIPCI_KATEGORILERI:
+        return hint
     norm = _norm_tr(text)
     full_norm = _norm_tr(f"{hint} {text}")
 

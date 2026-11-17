@@ -58,6 +58,16 @@ CATEGORY_META: Dict[str, Dict[str, str]] = {
         "title": "Sağlık, Termos, Takviye & Outdoor Fiyat Karşılaştırma",
         "desc": "Çelik termos, vitamin takviyeleri, ağız sağlığı elektroniği ve outdoor ekipmanlarında resmi satıcı fiyatlarını en düşükten en yükseğe görün.",
     },
+    "yapi_oto_bahce": {
+        "slug": "yapi-oto-bahce",
+        "title": "Yapı Market, Oto & Bahçe Ürünleri En Ucuz Fiyat Karşılaştırma",
+        "desc": "Matkap, el aletleri, oto lastik ve aksesuar, bahçe makineleri ve yapı market ürünlerinde mağazalar arası en düşük fiyatları görün.",
+    },
+    "giyim_aksesuar": {
+        "slug": "giyim-aksesuar",
+        "title": "Giyim, Ayakkabı, Saat & Aksesuar En Ucuz Fiyat Karşılaştırma",
+        "desc": "Spor ayakkabı, mont, akıllı olmayan saat, çanta ve aksesuarlarda mağazalar arası en düşük fiyatları karşılaştırın.",
+    },
 }
 
 

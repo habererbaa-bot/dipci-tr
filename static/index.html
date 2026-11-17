@@ -504,11 +504,13 @@
       teknoloji_beyaz_esya: { label: "Teknoloji & Beyaz Eşya" },
       ev_yasam_mutfak: { label: "Ev, Mutfak & Yaşam" },
       evcil_hayvan: { label: "Evcil Hayvan" },
-      saglik_spor_outdoor: { label: "Sağlık, Vitamin & Spor" }
+      saglik_spor_outdoor: { label: "Sağlık, Vitamin & Spor" },
+      yapi_oto_bahce: { label: "Yapı Market, Oto & Bahçe" },
+      giyim_aksesuar: { label: "Giyim, Saat & Aksesuar" }
     };
 
     function isUnitlessCategory(cat) {
-      return cat === "teknoloji_beyaz_esya" || cat === "ev_yasam_mutfak" || cat === "saglik_spor_outdoor";
+      return cat === "teknoloji_beyaz_esya" || cat === "ev_yasam_mutfak" || cat === "saglik_spor_outdoor" || cat === "yapi_oto_bahce" || cat === "giyim_aksesuar";
     }
 
     const VERDICT_LABELS = {
@@ -1184,7 +1186,9 @@
         teknoloji_beyaz_esya: "teknoloji-beyaz-esya",
         ev_yasam_mutfak: "ev-yasam-mutfak",
         evcil_hayvan: "evcil-hayvan",
-        saglik_spor_outdoor: "saglik-spor-outdoor"
+        saglik_spor_outdoor: "saglik-spor-outdoor",
+        yapi_oto_bahce: "yapi-oto-bahce",
+        giyim_aksesuar: "giyim-aksesuar"
       };
       if (window.history && window.history.replaceState) {
         window.history.replaceState(null, "", catKey && slugReverse[catKey] ? "/kategori/" + slugReverse[catKey] : "/");
@@ -1401,7 +1405,9 @@
         "teknoloji_beyaz_esya",
         "ev_yasam_mutfak",
         "evcil_hayvan",
-        "saglik_spor_outdoor"
+        "saglik_spor_outdoor",
+        "yapi_oto_bahce",
+        "giyim_aksesuar"
       ];
 
       const catFilterHtml = catKeys.map(ck => {
@@ -4746,7 +4752,9 @@
             "teknoloji-beyaz-esya": "teknoloji_beyaz_esya",
             "ev-yasam-mutfak": "ev_yasam_mutfak",
             "evcil-hayvan": "evcil_hayvan",
-            "saglik-spor-outdoor": "saglik_spor_outdoor"
+            "saglik-spor-outdoor": "saglik_spor_outdoor",
+            "yapi-oto-bahce": "yapi_oto_bahce",
+            "giyim-aksesuar": "giyim_aksesuar"
           };
           if (slugMap[slug]) {
             appState.selectedCategory = slugMap[slug];
