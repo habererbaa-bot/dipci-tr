@@ -87,7 +87,7 @@ def build_organization_and_website_schema() -> List[Dict]:
             "url": CANONICAL_ORIGIN,
             "logo": {
                 "@type": "ImageObject",
-                "url": f"{CANONICAL_ORIGIN}/static/brand/logo-light.svg",
+                "url": f"{CANONICAL_ORIGIN}/static/brand/logo-light.svg?v=2",
                 "width": 260,
                 "height": 64,
             },
@@ -353,7 +353,7 @@ def render_seo_hydrated_spa(
   <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
   <link rel="canonical" href="{esc_canon}" />
   <link rel="alternate" hreflang="tr-TR" href="{esc_canon}" />
-  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=2" />
   <link rel="apple-touch-icon" href="/static/brand/apple-touch-icon.png" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/brand/favicon-32.png" />
   <link rel="manifest" href="/static/manifest.json" />
@@ -589,7 +589,7 @@ def build_corporate_identity_html() -> str:
   <title>Kurumsal Kimlik, Algoritmik Şeffaflık &amp; Yasal İlkeler | dipci.tr</title>
   <meta name="description" content="dipci.tr kurumsal kimlik kılavuzu, 7 katmanlı bağımsız fiyat denetim metodolojisi, KVKK aydınlatma ilkeleri ve gelir ortaklığı şeffaflık beyanı." />
   <link rel="canonical" href="{CANONICAL_ORIGIN}/kurumsal" />
-  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=2" />
   <link rel="stylesheet" href="/static/app.css" />
   <script type="application/ld+json">{org_ld}</script>
 </head>
@@ -597,7 +597,7 @@ def build_corporate_identity_html() -> str:
   <header class="bg-white border-b border-slate-200">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <a href="/" class="flex items-center gap-3">
-        <img src="/static/brand/logo-light.svg" alt="dipci.tr Logo" class="h-8 w-auto" />
+        <img src="/static/brand/logo-light.svg?v=2" alt="dipci.tr Logo" class="h-8 w-auto" />
       </a>
       <a href="/" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white text-xs font-medium hover:bg-slate-800 transition">
         ← Ana Sayfaya Dön
@@ -620,11 +620,11 @@ def build_corporate_identity_html() -> str:
       <h2 class="text-base font-semibold text-slate-900">Logo ve Kurumsal Renk Standartları</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="p-5 rounded-xl bg-slate-50 border border-slate-200 flex flex-col items-center justify-center gap-2">
-          <img src="/static/brand/logo-light.svg" alt="dipci.tr Açık Zemin Logo" class="h-10" />
+          <img src="/static/brand/logo-light.svg?v=2" alt="dipci.tr Açık Zemin Logo" class="h-10" />
           <span class="text-xs text-slate-500">Açık Zemin Resmi Logo (SVG)</span>
         </div>
         <div class="p-5 rounded-xl bg-[#0F172A] flex flex-col items-center justify-center gap-2">
-          <img src="/static/brand/logo-dark.svg" alt="dipci.tr Koyu Zemin Logo" class="h-10" />
+          <img src="/static/brand/logo-dark.svg?v=2" alt="dipci.tr Koyu Zemin Logo" class="h-10" />
           <span class="text-xs text-slate-400">Koyu Zemin Resmi Logo (SVG)</span>
         </div>
       </div>
@@ -741,7 +741,7 @@ def build_legal_page_html(slug: str) -> str:
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{title} | dipci.tr</title>
   <link rel="canonical" href="{CANONICAL_ORIGIN}/{slug}" />
-  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg" />
+  <link rel="icon" type="image/svg+xml" href="/static/brand/favicon.svg?v=2" />
   <style>
     body{{margin:0;background:#f8fafc;color:#0f172a;font-family:Inter,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.65}}
     header{{background:#fff;border-bottom:1px solid #e2e8f0}}
@@ -753,7 +753,7 @@ def build_legal_page_html(slug: str) -> str:
   </style>
 </head>
 <body>
-  <header><div class="w"><a href="/"><img src="/static/brand/logo-light.svg" alt="dipci.tr" style="height:32px" /></a></div></header>
+  <header><div class="w"><a href="/"><img src="/static/brand/logo-light.svg?v=2" alt="dipci.tr" style="height:32px" /></a></div></header>
   <div class="w"><main><h1>{title}</h1>{body}<p style="color:#64748b;font-size:13px;margin-top:24px">Son güncelleme: 17 Kasım 2026</p></main></div>
   <footer class="w"><a href="/gizlilik">Gizlilik</a> · <a href="/kullanim-kosullari">Kullanım Koşulları</a> · <a href="/kurumsal">Kurumsal</a></footer>
 </body>

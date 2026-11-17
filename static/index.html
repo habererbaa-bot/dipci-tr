@@ -79,7 +79,7 @@
     <div class="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
       <div class="flex items-center gap-8">
         <a href="/" onclick="event.preventDefault();openVitrinHome()" class="flex items-center shrink-0">
-          <img src="/static/brand/logo-light.svg" alt="dipci.tr" class="h-8 w-auto" />
+          <img src="/static/brand/logo-light.svg?v=2" alt="dipci.tr" class="h-8 w-auto" />
         </a>
 
         <!-- Masaüstü Ana Navigasyon -->
@@ -146,7 +146,7 @@
     <div class="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-4 text-xs text-slate-500">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="flex items-center gap-2.5">
-          <img src="/static/brand/favicon.svg" alt="dipci.tr" class="w-5 h-5" />
+          <img src="/static/brand/favicon.svg?v=2" alt="dipci.tr" class="w-5 h-5" />
           <strong class="text-slate-900 font-semibold">dipci.tr</strong>
           <span class="text-slate-400">•</span>
           <span>Bağımsız Birim Fiyat ve Market Karşılaştırma Platformu</span>
@@ -989,7 +989,7 @@
             try {
               const notif = new Notification("dipci.tr Dip Alarmı", {
                 body: msg,
-                icon: "/static/brand/favicon.svg"
+                icon: "/static/brand/favicon.svg?v=2"
               });
               notif.onclick = function () {
                 window.focus();
