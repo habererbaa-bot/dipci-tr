@@ -63,11 +63,12 @@ def _db() -> sqlite3.Connection:
 def _kaynak(ref: str, utm: str, kendi_host: str = "dipci.tr") -> tuple:
     host = (urlparse(ref).hostname or "").lower().removeprefix("www.") if ref else ""
     if utm:
-        u = utm.lower()
-        for ad, parcalar in KAYNAK_ADLARI:
-            if any(p.split(".")[0] in u for p in parcalar):
-                return ad, host
-        return utm[:40], host
+        u = re.split(r"[^a-z0-9]+", utm.lower())[0]
+        utm_adlari = {"google": "Google", "bing": "Bing", "yandex": "Yandex", "basinca": "basinca.com", "facebook": "Facebook",
+                      "fb": "Facebook", "instagram": "Instagram", "ig": "Instagram", "twitter": "X (Twitter)", "x": "X (Twitter)",
+                      "whatsapp": "WhatsApp", "wa": "WhatsApp", "telegram": "Telegram", "tg": "Telegram", "youtube": "YouTube",
+                      "tiktok": "TikTok", "linkedin": "LinkedIn"}
+        return utm_adlari.get(u, utm[:40]), host
     if not host or host.endswith(kendi_host):
         return "Doğrudan", host or ""
     for ad, parcalar in KAYNAK_ADLARI:
