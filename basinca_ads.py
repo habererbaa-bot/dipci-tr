@@ -489,7 +489,7 @@ _refreshing: set = set()
 
 
 # Aynı ürün iki karta birden düşmesin: önce şok, sonra diğerleri; bir türe giren ürün sonrakilere girmez.
-POOL_ORDER = ("sok", "dip", "fark", "indirim-marketi", "kampanya", "amazon", "temizlik-bakim", "teknoloji-ev")
+POOL_ORDER = ("sok", "dip", "fark", "indirim-marketi", "amazon", "kampanya", "temizlik-bakim", "teknoloji-ev")
 _pool_lock = threading.Lock()
 POOL_SECONDS = 900
 
