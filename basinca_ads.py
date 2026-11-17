@@ -491,6 +491,7 @@ _refreshing: set = set()
 # Aynı ürün iki karta birden düşmesin: önce şok, sonra diğerleri; bir türe giren ürün sonrakilere girmez.
 POOL_ORDER = ("sok", "dip", "fark", "indirim-marketi", "kampanya", "amazon", "temizlik-bakim", "teknoloji-ev")
 _pool_lock = threading.Lock()
+POOL_SECONDS = 900
 
 
 def _build_all_pools(db) -> None:
