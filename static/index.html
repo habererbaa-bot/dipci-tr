@@ -40,19 +40,21 @@
     .scan-label .s { font-size: 12px; color: #94A3B8; }
     .scan-label .ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: rgba(16,185,129,.14); color: #34D399; border: 1px solid rgba(52,211,153,.35); }
     /* Ürün kartı (Kemal 16 Kas 2026: büyük görsel/ad, sıkı ve kurumsal market satırları) */
-    .pc-thumb { width: 84px; height: 84px; }
-    .pc-name { font-size: 15.5px; line-height: 1.3; font-weight: 600; color: #0F172A; }
+    .pc-thumb { width: 112px; height: 112px; }
+    @media (min-width: 640px) { .pc-thumb { width: 100%; height: 168px; } }
+    .pc-name { font-size: 16.5px; line-height: 1.3; font-weight: 700; color: #0F172A; }
     .pc-best { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
-    .pc-best b { font-size: 19px; font-weight: 700; color: #047857; letter-spacing: -.01em; }
-    .pc-best span { font-size: 12px; color: #64748B; }
+    .pc-best b { font-size: 24px; font-weight: 800; color: #047857; letter-spacing: -.02em; }
+    .pc-best span { font-size: 13px; color: #334155; font-weight: 600; }
     .pc-rows { border: 1px solid #EEF2F6; border-radius: 12px; overflow: hidden; }
-    .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-top: 1px solid #EEF2F6; color: inherit; text-decoration: none; }
+    .pc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 12px; border-top: 1px solid #EEF2F6; color: inherit; text-decoration: none; }
     .pc-row:first-child { border-top: 0; }
     a.pc-row:hover { background: #F8FAFC; }
-    .pc-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 70px; padding: 2px 8px; border-radius: 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
-    .pc-price { font-size: 13.5px; font-weight: 600; color: #1E293B; }
-    .pc-row.win .pc-price { color: #047857; font-weight: 700; }
-    .pc-unit { font-size: 11px; color: #94A3B8; margin-right: 8px; }
+    .pc-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 92px; padding: 4px 10px; border-radius: 7px; font-size: 13px; font-weight: 700; letter-spacing: .01em; white-space: nowrap; }
+    .pc-price { font-size: 16px; font-weight: 700; color: #1E293B; }
+    .pc-row.win { background: #ECFDF5; }
+    .pc-row.win .pc-price { color: #047857; font-weight: 800; }
+    .pc-unit { font-size: 12px; color: #64748B; margin-right: 10px; }
     .scan-mini { position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px 0 14px; margin-left: 6px; border-radius: 11px; overflow: hidden; cursor: pointer;
       background: radial-gradient(140% 160% at 50% 0%, #1E293B 0%, #0B1220 70%); color: #fff; font-size: 13.5px; font-weight: 600; white-space: nowrap;
       border: 1px solid rgba(52,211,153,.45); box-shadow: 0 0 0 3px rgba(16,185,129,.10), 0 6px 16px -8px rgba(2,6,23,.6); }
@@ -102,7 +104,7 @@
             Topluluk
           </button>
           <label class="scan-mini" role="button" tabindex="0" aria-label="Ürün ya da barkod tara: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
-            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Ürün / Barkod Tara</span>
+            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span class="hidden 2xl:inline">Ürün / Barkod Tara</span><span class="2xl:hidden">Tara</span>
             <input id="navScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
           </label>
         </nav>
@@ -117,7 +119,7 @@
           <span class="hidden sm:inline md:hidden xl:inline">Dip Alarmı</span>
         </button>
 
-        <div id="authHeaderSlot">
+        <div id="authHeaderSlot" class="shrink-0">
           <button onclick="openAuthModal()" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">
             Giriş Yap
           </button>
@@ -673,7 +675,7 @@
       if (appState.member) {
         slot.innerHTML = `
           <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg">
-            <span class="text-xs font-medium text-slate-800">${escapeHtml(appState.member.display_name)}</span>
+            <span class="text-xs font-medium text-slate-800 whitespace-nowrap">${escapeHtml(appState.member.display_name)}</span>
             <button onclick="logoutMember()" title="Çıkış Yap" class="text-xs text-slate-400 hover:text-rose-600 font-medium">Çıkış</button>
           </div>
         `;
@@ -1490,18 +1492,18 @@
                         class="max-w-full max-h-full object-contain" />
                       <div style="display:none" class="w-20 h-20 rounded-xl bg-slate-50 items-center justify-center text-sm font-semibold text-slate-500">${escapeHtml(initials)}</div>
                     ` : `<div class="w-20 h-20 rounded-xl bg-slate-50 flex items-center justify-center text-sm font-semibold text-slate-500">${escapeHtml(initials)}</div>`}
-                    <span class="absolute top-2 right-2 px-2 py-1 rounded-md bg-emerald-600 text-white text-xs font-bold num">-%${Number(d.drop_pct || 0).toFixed(0)}</span>
+                    <span class="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-sm font-extrabold num">-%${Number(d.drop_pct || 0).toFixed(0)}</span>
                   </div>
                   <div class="p-3 flex flex-col gap-2 flex-1 justify-between">
                     <div>
-                      <span class="text-[11px] font-semibold uppercase text-slate-500 truncate block">${escapeHtml(st.short)}</span>
-                      <div class="text-sm font-semibold text-slate-900 line-clamp-2 mt-0.5 leading-snug">
+                      <span class="pc-chip" style="background:${st.accent};color:${st.textOnAccent || '#fff'}">${escapeHtml(st.short)}</span>
+                      <div class="text-[15px] font-bold text-slate-900 line-clamp-2 mt-1.5 leading-snug">
                         ${escapeHtml(d.brand + " " + d.family_name)}
                       </div>
                     </div>
                     <div class="flex items-baseline justify-between gap-2 pt-2 border-t border-slate-100 num">
-                      <span class="text-xs text-slate-400 line-through">${Number(d.old_ref_pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
-                      <span class="text-base font-bold text-emerald-700">${Number(d.new_pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                      <span class="text-sm text-slate-500 line-through">${Number(d.old_ref_pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                      <span class="text-xl font-extrabold text-emerald-700">${Number(d.new_pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
                     </div>
                   </div>
                 </div>
@@ -1540,7 +1542,7 @@
           return `<div class="${cls}">${content}</div>`;
         }).join("");
         const bestQ = quotes[0];
-        const bestHtml = bestQ ? `<div class="pc-best num"><b>${Number(bestQ.pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</b><span>en ucuz · ${escapeHtml(getBrandStyle(bestQ.platform, true).short)}</span></div>` : "";
+        const bestHtml = bestQ ? `<div class="pc-best num"><b>${Number(bestQ.pack_price || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</b><span>en ucuz: ${escapeHtml(getBrandStyle(bestQ.platform, true).short)}</span></div>` : "";
 
         return `
           <article
@@ -1549,11 +1551,11 @@
           >
             <div class="space-y-3">
               <!-- Ürün Başlığı -->
-              <div class="flex items-start gap-3">
+              <div class="flex sm:flex-col items-start sm:items-stretch gap-3">
                 ${renderProductThumb(p.image_url, p.brand, p.category, "pc-thumb")}
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center justify-between gap-2">
-                    <span class="text-[11px] font-medium text-slate-500 uppercase tracking-wide truncate">${escapeHtml(p.brand)}</span>
+                    <span class="text-xs font-semibold text-slate-600 uppercase tracking-wide truncate">${escapeHtml(p.brand)}</span>
                     ${isRealDrop
                       ? `<span class="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-semibold shrink-0 num">-%${Number(p.drop_vs_median_pct).toFixed(0)} İndirim</span>`
                       : (p.savings_pct >= 5
