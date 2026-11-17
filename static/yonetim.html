@@ -70,6 +70,8 @@
   var aralik = "gun", zaman = null;
   var token = "";
   try { token = localStorage.getItem("dipci_session_token") || ""; } catch (e) {}
+  // Bu tarayıcıdaki ziyaretler sayılmasın (yöneticinin kendi gezintisi istatistiği bozmasın).
+  try { localStorage.setItem("dz_sayma", "1"); } catch (e) {}
   var ADLAR = { gun: "Bugün (saatlik)", hafta: "Son 7 gün", ay: "Son 30 gün" };
 
   function n(x) { return Number(x || 0).toLocaleString("tr-TR"); }
@@ -128,7 +130,7 @@
         '<div class="kart"><h2>Gelen siteler</h2>' + tablo(d.siteler) + "</div>" +
         '<div class="kart"><h2>Cihaz</h2>' + tablo(d.cihazlar) + '<h2 style="margin-top:18px">Kampanya kaynakları (utm)</h2>' + tablo(d.kampanyalar) + "</div>" +
       "</div>" +
-      '<p class="bilgi">Robotlar sayılmaz; kişisel bilgi saklanmaz. Ziyaretçi = o gün siteye giren tekil kişi. Sayfa 30 saniyede bir kendini yeniler.</p>';
+      '<p class="bilgi">Robotlar ve bu paneli açan yönetici tarayıcıları sayılmaz; kişisel bilgi saklanmaz. Ziyaretçi = o gün siteye giren tekil kişi. Sayfa 30 saniyede bir kendini yeniler.</p>';
   }
 
   function yukle() {

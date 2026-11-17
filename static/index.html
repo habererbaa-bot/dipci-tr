@@ -4588,6 +4588,8 @@
           try { ss.setItem("dz_ref", ref); ss.setItem("dz_utm", utm); } catch (e) {}
         }
         var son = "";
+        // Yönetici kendi ziyaretini saymasın: /yonetim sayfasını bir kez açan tarayıcı işaretlenir.
+        try { if (localStorage.getItem("dz_sayma") === "1") return; } catch (e) {}
         function gonder() {
           var p = location.pathname;
           if (p === son) return;
