@@ -60,7 +60,7 @@ class EmailOTPClient:
         return bool(self.resend_api_key or (self.smtp_host and self.smtp_user and self.smtp_pass))
 
     def send_otp_email(self, to_email: str, display_name: str, otp_code: str) -> Tuple[bool, str]:
-        subject = f"{otp_code} — dipci.tr Doğrulama Kodunuz"
+        subject = f"dipci.tr giriş kodunuz: {otp_code}"
         html_body = f"""
         <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;background:#ffffff;color:#0f172a">
           <div style="font-size:18px;font-weight:800;color:#0b132b">dipci<span style="color:#10b981">.tr</span></div>
@@ -70,16 +70,27 @@ class EmailOTPClient:
             {otp_code}
           </div>
           <p style="font-size:12px;color:#64748b">Bu kod 10 dakika geçerlidir. Kimseyle paylaşmayınız.</p>
+          <p style="font-size:11px;color:#94a3b8;margin-top:18px;border-top:1px solid #e2e8f0;padding-top:12px">Bu e-postayı dipci.tr'de e-posta ile giriş istediğiniz için aldınız. Siz istemediyseniz görmezden gelebilirsiniz. dipci.tr · <a href="https://dipci.tr" style="color:#047857">dipci.tr</a></p>
         </div>
         """
+        # Düz metin sürümü: Hotmail/Outlook yalnız HTML içeren postaları daha sık gereksize atıyor (17 Kas 2026).
+        text_body = (
+            f"Merhaba {display_name},\n\n"
+            f"dipci.tr giriş kodunuz: {otp_code}\n\n"
+            "Bu kod 10 dakika geçerlidir. Kimseyle paylaşmayınız.\n\n"
+            "Bu e-postayı dipci.tr'de e-posta ile giriş istediğiniz için aldınız. Siz istemediyseniz görmezden gelebilirsiniz.\n"
+            "https://dipci.tr\n"
+        )
 
         if self.resend_api_key:
             payload = json.dumps(
                 {
-                    "from": f"dipci.tr Doğrulama <{self.smtp_from}>",
+                    "from": f"dipci.tr <{self.smtp_from}>",
                     "to": [to_email],
                     "subject": subject,
                     "html": html_body,
+                    "text": text_body,
+                    "reply_to": "iletisim@dipci.tr",
                 }
             ).encode("utf-8")
             req = urllib.request.Request(
