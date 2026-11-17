@@ -14,6 +14,7 @@ import os
 import re
 import sys
 import time
+import urllib.error
 import urllib.request
 from datetime import datetime
 from pathlib import Path
@@ -85,14 +86,18 @@ def gemini(sistem: str, soru: str) -> str:
             headers={"content-type": "application/json", "x-goog-api-key": anahtar},
         )
         try:
-            with urllib.request.urlopen(req, timeout=300) as r:
+            with urllib.request.urlopen(req, timeout=420) as r:
                 j = json.loads(r.read().decode("utf-8"))
             return "".join(p.get("text", "") for p in j["candidates"][0]["content"]["parts"])
         except urllib.error.HTTPError as e:
-            if e.code in (429, 503):
+            if e.code in (429, 500, 503):
                 time.sleep(20 * (i + 1))
                 continue
             raise
+        except (TimeoutError, urllib.error.URLError, OSError):
+            # Ücretsiz katman yoğunken cevap geç gelebiliyor; bekleyip yeniden dene.
+            time.sleep(30 * (i + 1))
+            continue
     raise RuntimeError("Gemini ücretsiz: yoğunluk geçmedi")
 
 
