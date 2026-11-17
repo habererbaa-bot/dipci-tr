@@ -554,17 +554,27 @@ class SocialCommunityService:
         content: str,
         coupon_code: str = "",
         usage_months: int = 0,
+        seen_store: str = "",
+        seen_price: float = 0.0,
     ) -> Dict:
         member = self.get_member_by_token(session_token)
         if not member:
-            return {"ok": False, "error": "Yorum yazmak için lütfen telefon doğrulaması ile giriş yapın."}
+            return {"ok": False, "error": "Paylaşım yapmak için Google ya da e-posta ile giriş yapın (onaylı üye)."}
+        self._ensure_seen_columns()
 
         mod = AIContentModerator.inspect(content)
         if not mod.allowed:
             return {"ok": False, "error": mod.reason, "moderation_status": mod.status}
 
-        valid_types = {"COUPON_TIP", "LONG_TERM_REVIEW", "FIRST_IMPRESSION"}
+        valid_types = {"COUPON_TIP", "LONG_TERM_REVIEW", "FIRST_IMPRESSION", "PRICE_SEEN"}
         p_type = post_type if post_type in valid_types else "FIRST_IMPRESSION"
+        store_clean = re.sub(r"\s+", " ", (seen_store or "")).strip()[:60]
+        try:
+            price_clean = round(float(seen_price or 0), 2)
+        except (TypeError, ValueError):
+            price_clean = 0.0
+        if p_type == "PRICE_SEEN" and (not store_clean or not (0 < price_clean < 1_000_000)):
+            return {"ok": False, "error": "Gördüğünüz fiyatı paylaşmak için mağaza adını ve fiyatı yazın."}
         has_cam = 1 if product_key in member["scanned_products"] else 0
         vis_status = "SHADOW_HIDDEN" if member["is_shadowbanned"] else "APPROVED"
 
@@ -574,8 +584,8 @@ class SocialCommunityService:
             """
             INSERT INTO product_social_posts
             (product_key, member_id, post_type, coupon_code, usage_months, content,
-             has_camera_badge, moderation_status, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             has_camera_badge, moderation_status, created_at, seen_store, seen_price)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 product_key,
@@ -587,6 +597,8 @@ class SocialCommunityService:
                 has_cam,
                 vis_status,
                 datetime.now().isoformat(),
+                store_clean if p_type == "PRICE_SEEN" else "",
+                price_clean if p_type == "PRICE_SEEN" else 0,
             ),
         )
         self.conn.commit()
@@ -594,8 +606,52 @@ class SocialCommunityService:
             "ok": True,
             "post_id": cur.lastrowid,
             "has_camera_badge": bool(has_cam),
-            "message": "Paylaşımınız AI moderasyonundan geçti ve yayına alındı!",
+            "message": "Paylaşımınız denetimden geçti ve yayına alındı.",
         }
+
+    def _ensure_seen_columns(self) -> None:
+        """'Gördüğüm fiyat' paylaşımı için mağaza ve fiyat sütunları (Kemal, 17 Kas 2026)."""
+        cols = {r[1] for r in self.conn.execute("PRAGMA table_info(product_social_posts)").fetchall()}
+        if "seen_store" not in cols:
+            self.conn.execute("ALTER TABLE product_social_posts ADD COLUMN seen_store TEXT NOT NULL DEFAULT ''")
+        if "seen_price" not in cols:
+            self.conn.execute("ALTER TABLE product_social_posts ADD COLUMN seen_price REAL NOT NULL DEFAULT 0")
+        self.conn.commit()
+
+    def community_feed(self, limit: int = 40) -> List[Dict]:
+        """Topluluk akışı: bütün ürünlerdeki son yorumlar, gördüğüm fiyatlar ve kupon notları."""
+        self._ensure_seen_columns()
+        rows = self.conn.execute(
+            """
+            SELECT p.*, m.display_name, c.brand, c.family_name, i.image_url, i.best_pack_price
+            FROM product_social_posts p
+            JOIN verified_members m ON p.member_id = m.member_id
+            LEFT JOIN canonical_products c ON c.product_key = p.product_key
+            LEFT JOIN product_catalog_index i ON i.product_key = p.product_key
+            WHERE p.moderation_status = 'APPROVED'
+            ORDER BY p.created_at DESC
+            LIMIT ?
+            """,
+            (max(1, min(int(limit or 40), 100)),),
+        ).fetchall()
+        return [
+            {
+                "post_id": r["post_id"],
+                "post_type": r["post_type"],
+                "product_key": r["product_key"],
+                "product_name": f"{r['brand'] or ''} {r['family_name'] or ''}".strip() or r["product_key"],
+                "image_url": r["image_url"] or "",
+                "best_price": float(r["best_pack_price"] or 0),
+                "seen_store": r["seen_store"],
+                "seen_price": float(r["seen_price"] or 0),
+                "coupon_code": r["coupon_code"],
+                "content": r["content"],
+                "helpful_count": r["helpful_count"],
+                "author_name": r["display_name"],
+                "created_at": r["created_at"][:16].replace("T", " "),
+            }
+            for r in rows
+        ]
 
     def list_product_posts(self, product_key: str) -> List[Dict]:
         rows = self.conn.execute(
@@ -619,6 +675,8 @@ class SocialCommunityService:
                 "post_type": r["post_type"],
                 "coupon_code": r["coupon_code"],
                 "usage_months": r["usage_months"],
+                "seen_store": r["seen_store"] if "seen_store" in r.keys() else "",
+                "seen_price": float(r["seen_price"]) if "seen_price" in r.keys() else 0.0,
                 "content": r["content"],
                 "has_camera_badge": bool(r["has_camera_badge"]),
                 "helpful_count": r["helpful_count"],

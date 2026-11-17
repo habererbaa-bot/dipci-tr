@@ -98,6 +98,9 @@
           <button onclick="switchMainView('custom_basket')" id="dtab-custom_basket" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Kendi Sepetim
           </button>
+          <button onclick="switchMainView('topluluk')" id="dtab-topluluk" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+            Topluluk
+          </button>
           <label class="scan-mini" role="button" tabindex="0" aria-label="Ürün ya da barkod tara: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
             <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Ürün / Barkod Tara</span>
             <input id="navScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
@@ -175,7 +178,7 @@
   </footer>
 
   <!-- MOBİL ALT NAVİGASYON -->
-  <nav aria-label="Mobil Menü" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 px-1.5 py-1.5 grid grid-cols-5 gap-1">
+  <nav aria-label="Mobil Menü" class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 px-1 py-1.5 grid grid-cols-6 gap-0.5">
     <button onclick="switchMainView('vitrin')" id="mtab-vitrin" class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium text-slate-900">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
         <circle cx="11" cy="11" r="7.5" /><path stroke-linecap="round" d="m20 20-3.8-3.8" />
@@ -200,6 +203,12 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
       </svg>
       <span>Listem</span>
+    </button>
+    <button onclick="switchMainView('topluluk')" id="mtab-topluluk" class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-medium text-slate-500">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M8 10h8M8 14h5M21 12c0 4.4-4 8-9 8-1.5 0-2.9-.3-4.1-.9L3 20l1.3-3.5C3.5 15.2 3 13.6 3 12c0-4.4 4-8 9-8s9 3.6 9 8Z" />
+      </svg>
+      <span>Topluluk</span>
     </button>
     <label class="flex flex-col items-center justify-center gap-1 py-1.5 rounded-lg text-[10px] font-semibold text-slate-900 cursor-pointer" aria-label="Ürün ya da barkod tara: kamerayı aç">
       <span class="scan-tile"><span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg></span>
@@ -1252,6 +1261,12 @@
           await loadProductDetail(appState.selectedProductKey);
           return;
         }
+      } else if (viewName === "topluluk") {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, "", "/topluluk");
+        }
+        document.title = "Topluluk — Gördüğün Fiyatı Paylaş, Fırsatı Duyur | dipci.tr";
+        await loadCommunityFeed();
       } else if (viewName === "deals") {
         if (window.history && window.history.replaceState) {
           window.history.replaceState(null, "", "/firsatlar");
@@ -1918,7 +1933,8 @@
         const typeLabels = {
           COUPON_TIP: "Kupon & İndirim Notu",
           LONG_TERM_REVIEW: "Uzun Kullanım Deneyimi",
-          FIRST_IMPRESSION: "Ürün Gözlemi"
+          FIRST_IMPRESSION: "Ürün Gözlemi",
+          PRICE_SEEN: "Gördüğüm Fiyat"
         };
 
         tabBodyHtml = `
@@ -1929,11 +1945,14 @@
               ${appState.member ? `
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <select id="postTypeSelect" aria-label="Paylaşım Türü" onchange="togglePostExtraFields()" class="px-3 py-2 rounded-lg border border-slate-300 text-xs font-medium bg-white">
+                    <option value="PRICE_SEEN">Gördüğüm Fiyat</option>
                     <option value="COUPON_TIP">Kupon / İndirim Notu</option>
                     <option value="LONG_TERM_REVIEW">Uzun Kullanım Deneyimi</option>
                     <option value="FIRST_IMPRESSION">Ürün Gözlemi</option>
                   </select>
-                  <input id="postCouponInput" type="text" placeholder="Kupon Kodu (İsteğe bağlı)" class="px-3 py-2 rounded-lg border border-slate-300 text-xs uppercase font-mono" />
+                  <input id="postCouponInput" type="text" placeholder="Kupon Kodu (İsteğe bağlı)" class="hidden px-3 py-2 rounded-lg border border-slate-300 text-xs uppercase font-mono" />
+                  <input id="postSeenStoreInput" type="text" placeholder="Mağaza (örn: BİM Merkez şube)" class="px-3 py-2 rounded-lg border border-slate-300 text-xs outline-none focus:border-slate-900" />
+                  <input id="postSeenPriceInput" type="number" step="0.01" min="0" placeholder="Gördüğünüz fiyat (TL)" class="px-3 py-2 rounded-lg border border-slate-300 text-xs outline-none focus:border-slate-900" />
                   <input id="postMonthsInput" type="number" min="1" max="120" placeholder="Kullanım süresi (ay)" class="hidden px-3 py-2 rounded-lg border border-slate-300 text-xs" />
                 </div>
                 <textarea id="postContentInput" rows="2" placeholder="Deneyiminizi veya indirim bilgisini yazın..." class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs outline-none focus:border-slate-900"></textarea>
@@ -1966,6 +1985,12 @@
                       ${escapeHtml(typeLabels[p.post_type] || "Ürün Gözlemi")}${p.usage_months > 0 ? " • " + p.usage_months + " Ay" : ""}
                     </span>
                   </div>
+                  ${p.post_type === "PRICE_SEEN" && p.seen_price > 0 ? `
+                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs num">
+                      <span class="text-emerald-800 font-medium">${escapeHtml(p.seen_store)}</span>
+                      <span class="font-bold text-emerald-700">${Number(p.seen_price).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TL</span>
+                    </div>
+                  ` : ""}
                   ${p.coupon_code ? `
                     <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-100 text-xs">
                       <span class="text-slate-600">Kupon:</span>
@@ -2144,6 +2169,8 @@
       const val = document.getElementById("postTypeSelect").value;
       document.getElementById("postCouponInput").classList.toggle("hidden", val !== "COUPON_TIP");
       document.getElementById("postMonthsInput").classList.toggle("hidden", val !== "LONG_TERM_REVIEW");
+      document.getElementById("postSeenStoreInput").classList.toggle("hidden", val !== "PRICE_SEEN");
+      document.getElementById("postSeenPriceInput").classList.toggle("hidden", val !== "PRICE_SEEN");
     }
 
     async function submitProductPost(productKey) {
@@ -2151,10 +2178,16 @@
       const content = document.getElementById("postContentInput").value;
       const coupon_code = document.getElementById("postCouponInput").value;
       const usage_months = parseInt(document.getElementById("postMonthsInput").value || "0", 10);
+      const seen_store = (document.getElementById("postSeenStoreInput") || {}).value || "";
+      const seen_price = parseFloat(((document.getElementById("postSeenPriceInput") || {}).value || "0").replace(",", ".")) || 0;
+      let metin = content;
+      if (post_type === "PRICE_SEEN" && !metin.trim() && seen_store && seen_price > 0) {
+        metin = seen_store + " mağazasında " + seen_price.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) + " TL'ye gördüm.";
+      }
 
       const { data } = await apiFetch("/api/social/posts", {
         method: "POST",
-        body: JSON.stringify({ product_key: productKey, post_type, content, coupon_code, usage_months })
+        body: JSON.stringify({ product_key: productKey, post_type, content: metin, coupon_code, usage_months, seen_store, seen_price })
       });
       if (!data.ok) {
         showToast(data.error, "error");
@@ -3121,6 +3154,177 @@
         </section>
 
         ${subTab === "radar" ? radarTabHtml : communityTabHtml}
+      `;
+    }
+
+    // ----------------- Topluluk (Kemal, 17 Kas 2026) -----------------
+    // Onaylı üyeler (Google / e-posta doğrulamalı) gördükleri fiyatı paylaşır, fırsat duyurur, ürünlere yorum yapar.
+    async function loadCommunityFeed() {
+      try {
+        const { data } = await apiFetch("/api/social/feed?limit=50");
+        appState.communityPosts = (data && data.posts) || [];
+        appState.deals = (data && data.deals) || appState.deals || [];
+      } catch (e) {
+        appState.communityPosts = appState.communityPosts || [];
+      }
+    }
+
+    async function searchCommunityProduct(q) {
+      const box = document.getElementById("tpUrunSonuc");
+      if (!box) return;
+      q = (q || "").trim();
+      if (q.length < 2) { box.innerHTML = ""; return; }
+      clearTimeout(window.__tpAra);
+      window.__tpAra = setTimeout(async () => {
+        const { data } = await apiFetch("/api/products?q=" + encodeURIComponent(q) + "&limit=6");
+        const items = (data && data.items) || [];
+        box.innerHTML = items.length ? items.map(p => `
+          <button type="button" onclick="pickCommunityProduct('${p.product_key}', this.dataset.ad)" data-ad="${escapeHtml(p.brand + " " + p.family_name)}"
+            class="w-full flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 text-left">
+            ${renderProductThumb(p.image_url, p.brand, p.category, "w-9 h-9")}
+            <span class="text-xs font-medium text-slate-800 line-clamp-2">${escapeHtml(p.brand + " " + p.family_name)}</span>
+          </button>`).join("") : '<p class="text-xs text-slate-500 p-2">Ürün bulunamadı.</p>';
+      }, 250);
+    }
+
+    function pickCommunityProduct(key, ad) {
+      appState.tpUrun = { key, ad };
+      const sec = document.getElementById("tpSecili");
+      if (sec) sec.innerHTML = `<span class="font-semibold text-slate-900">${escapeHtml(ad)}</span> <button type="button" onclick="appState.tpUrun=null;renderCurrentView()" class="text-slate-500 underline ml-1">değiştir</button>`;
+      const box = document.getElementById("tpUrunSonuc"); if (box) box.innerHTML = "";
+      const ara = document.getElementById("tpUrunAra"); if (ara) ara.classList.add("hidden");
+    }
+
+    async function submitCommunityPrice() {
+      if (!appState.member) { openAuthModal(); return; }
+      const u = appState.tpUrun;
+      const magaza = document.getElementById("tpMagaza").value.trim();
+      const fiyat = parseFloat((document.getElementById("tpFiyat").value || "0").replace(",", ".")) || 0;
+      const not = document.getElementById("tpNot").value.trim();
+      if (!u) { showToast("Önce ürünü seçin.", "error"); return; }
+      if (!magaza || !(fiyat > 0)) { showToast("Mağaza adını ve gördüğünüz fiyatı yazın.", "error"); return; }
+      const content = not || (magaza + " mağazasında " + fiyat.toLocaleString("tr-TR", { minimumFractionDigits: 2 }) + " TL'ye gördüm.");
+      const { data } = await apiFetch("/api/social/posts", {
+        method: "POST",
+        body: JSON.stringify({ product_key: u.key, post_type: "PRICE_SEEN", content, seen_store: magaza, seen_price: fiyat })
+      });
+      if (!data.ok) { showToast(data.error, "error"); return; }
+      showToast("Paylaşımınız yayında, teşekkürler!", "success");
+      appState.tpUrun = null;
+      await loadCommunityFeed();
+      renderCurrentView();
+    }
+
+    function renderCommunityView() {
+      const sekme = appState.toplulukSekme || "akis";
+      const posts = appState.communityPosts || [];
+      const deals = appState.deals || [];
+      const etiket = { PRICE_SEEN: "Gördüğüm fiyat", COUPON_TIP: "Kupon / indirim", LONG_TERM_REVIEW: "Kullanım deneyimi", FIRST_IMPRESSION: "Yorum" };
+      const tl = v => Number(v || 0).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+      const u = appState.tpUrun;
+
+      const paylasKutusu = appState.member ? `
+        <div class="space-y-2.5">
+          <div class="text-xs font-semibold text-slate-700">1. Ürünü seçin</div>
+          <div id="tpSecili" class="text-xs text-slate-600">${u ? `<span class="font-semibold text-slate-900">${escapeHtml(u.ad)}</span> <button type="button" onclick="appState.tpUrun=null;renderCurrentView()" class="text-slate-500 underline ml-1">değiştir</button>` : ""}</div>
+          <input id="tpUrunAra" type="search" oninput="searchCommunityProduct(this.value)" placeholder="Ürün adı ya da marka yazın…" class="${u ? "hidden " : ""}w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900" />
+          <div id="tpUrunSonuc" class="space-y-0.5"></div>
+          <div class="text-xs font-semibold text-slate-700 pt-1">2. Nerede, kaça gördünüz?</div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="tpMagaza" type="text" placeholder="Mağaza (örn: BİM Kızılay)" class="px-3 py-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900" />
+            <input id="tpFiyat" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Fiyat (TL)" class="px-3 py-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900" />
+          </div>
+          <textarea id="tpNot" rows="2" placeholder="Kısa not (isteğe bağlı): rafta son 3 tane kaldı, kampanya cumaya kadar…" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900"></textarea>
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs text-slate-500">${escapeHtml(appState.member.display_name)} olarak paylaşılıyor</span>
+            <button onclick="submitCommunityPrice()" class="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Fiyatı Paylaş</button>
+          </div>
+        </div>` : `
+        <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+          <p class="text-sm text-slate-700">Paylaşım yapmak ve yorum yazmak için <strong>onaylı üye</strong> olmanız gerekir: Google ya da e-posta koduyla giriş yapın.</p>
+          <button onclick="openAuthModal()" class="px-4 py-2.5 rounded-lg bg-slate-900 text-white text-sm font-semibold">Giriş Yap</button>
+        </div>`;
+
+      const akis = posts.length ? posts.map(p => `
+        <article class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="w-7 h-7 rounded-full bg-slate-900 text-white text-[11px] font-bold flex items-center justify-center shrink-0">${escapeHtml((p.author_name || "?").slice(0, 1).toUpperCase())}</span>
+              <span class="text-xs font-semibold text-slate-900 truncate">${escapeHtml(p.author_name)}</span>
+              <span class="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 text-[10px] font-semibold">Onaylı üye</span>
+            </div>
+            <span class="text-[11px] text-slate-500">${escapeHtml(etiket[p.post_type] || "Yorum")} · ${escapeHtml(p.created_at)}</span>
+          </div>
+          <button type="button" onclick="openProductXray('${p.product_key}')" class="w-full flex items-center gap-3 p-2 rounded-xl bg-slate-50 hover:bg-slate-100 text-left">
+            ${renderProductThumb(p.image_url, p.product_name, "", "w-11 h-11")}
+            <span class="min-w-0 flex-1">
+              <span class="block text-sm font-semibold text-slate-900 line-clamp-1">${escapeHtml(p.product_name)}</span>
+              ${p.best_price > 0 ? `<span class="block text-[11px] text-slate-500 num">dipci'de en ucuz ${tl(p.best_price)}</span>` : ""}
+            </span>
+          </button>
+          ${p.post_type === "PRICE_SEEN" && p.seen_price > 0 ? `
+            <div class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 num">
+              <span class="text-xs font-medium text-emerald-900">${escapeHtml(p.seen_store)}</span>
+              <span class="text-base font-bold text-emerald-700">${tl(p.seen_price)}</span>
+            </div>` : ""}
+          ${p.coupon_code ? `<code class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-xs font-semibold">Kupon: ${escapeHtml(p.coupon_code)}</code>` : ""}
+          <p class="text-sm text-slate-700 leading-relaxed">${escapeHtml(p.content)}</p>
+          <div class="flex justify-end">
+            <button onclick="upvotePost(${p.post_id}).then(()=>loadCommunityFeed()).then(()=>renderCurrentView())" class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50">Faydalı (${p.helpful_count})</button>
+          </div>
+        </article>`).join("") : `
+        <div class="p-8 rounded-2xl bg-white border border-slate-200 text-center space-y-1.5">
+          <div class="text-sm font-semibold text-slate-800">Henüz paylaşım yok, ilk siz olun.</div>
+          <p class="text-xs text-slate-500">Markette ya da mağazada gördüğünüz fiyatı yazın; herkes faydalansın.</p>
+        </div>`;
+
+      const firsatlar = deals.length ? deals.map(d => `
+        <div class="p-4 rounded-2xl bg-white border border-slate-200 space-y-2.5">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+              <div class="text-[11px] text-slate-500">${escapeHtml(d.author_name)} · onaylı üye</div>
+              <h3 class="text-sm font-semibold text-slate-900 mt-0.5">${escapeHtml(d.title)}</h3>
+            </div>
+            <div class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1 shrink-0 num">
+              <button onclick="voteDeal(${d.deal_id}, -1)" aria-label="Soğuk" class="w-8 h-8 rounded hover:bg-white text-sm font-semibold text-slate-500">−</button>
+              <span class="px-1.5 text-xs font-semibold text-slate-800">${d.temperature}°</span>
+              <button onclick="voteDeal(${d.deal_id}, 1)" aria-label="Sıcak" class="w-8 h-8 rounded hover:bg-white text-sm font-semibold text-emerald-700">+</button>
+            </div>
+          </div>
+          ${d.note ? `<p class="text-sm text-slate-600">${escapeHtml(d.note)}</p>` : ""}
+          <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap num">
+            <span class="text-base font-bold text-slate-900">${tl(d.sale_price)}${d.coupon_code ? ` <code class="ml-1 px-2 py-0.5 rounded bg-slate-100 text-slate-800 text-xs font-semibold">Kupon: ${escapeHtml(d.coupon_code)}</code>` : ""}</span>
+            <a href="${escapeHtml(d.tracked_affiliate_url)}" target="_blank" rel="noopener" class="px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-xs font-medium text-white">Mağazaya Git ↗</a>
+          </div>
+        </div>`).join("") : `
+        <div class="p-8 rounded-2xl bg-white border border-slate-200 text-center text-sm text-slate-600">Henüz üye fırsatı yok.</div>`;
+
+      return `
+        <section class="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 space-y-3">
+          <h1 class="text-lg sm:text-xl font-semibold text-slate-900">Topluluk</h1>
+          <p class="text-sm text-slate-600">Gördüğünüz fiyatı paylaşın, yakaladığınız fırsatı duyurun. Paylaşımları yalnız onaylı üyeler yapabilir; her paylaşım yayından önce denetlenir.</p>
+          <div class="flex items-center gap-2 pt-1">
+            <button onclick="appState.toplulukSekme='akis';renderCurrentView()" class="px-3.5 py-2 rounded-lg text-xs font-semibold ${sekme === "akis" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}">Fiyatlar & Yorumlar (${posts.length})</button>
+            <button onclick="appState.toplulukSekme='firsat';renderCurrentView()" class="px-3.5 py-2 rounded-lg text-xs font-semibold ${sekme === "firsat" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-600"}">Üye Fırsatları (${deals.length})</button>
+          </div>
+        </section>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+          <aside class="lg:col-span-5 lg:sticky lg:top-24 p-5 rounded-2xl bg-white border border-slate-200 space-y-3">
+            <h2 class="text-base font-semibold text-slate-900">${sekme === "firsat" ? "Fırsat Duyurun" : "Gördüğünüz Fiyatı Paylaşın"}</h2>
+            ${sekme === "firsat" ? (appState.member ? `
+              <div class="space-y-2.5">
+                <input id="dealTitleInput" type="text" placeholder="Ürün ve gramaj (örn: Finish Quantum 100 Kapsül)" class="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900" />
+                <input id="dealUrlInput" type="url" placeholder="Mağaza ürün bağlantısı (https://…)" class="w-full px-3 py-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900" />
+                <div class="grid grid-cols-2 gap-2">
+                  <input id="dealPriceInput" type="number" step="0.01" placeholder="Fiyat (TL)" class="px-3 py-2.5 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900" />
+                  <input id="dealCouponInput" type="text" placeholder="Kupon kodu (varsa)" class="px-3 py-2.5 rounded-lg border border-slate-300 text-sm uppercase font-mono outline-none focus:border-slate-900" />
+                </div>
+                <textarea id="dealNoteInput" rows="2" placeholder="Kısa açıklama…" class="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm outline-none focus:border-slate-900"></textarea>
+                <button onclick="submitCommunityDeal().then(()=>{appState.view='topluluk';loadCommunityFeed().then(renderCurrentView)})" class="w-full py-2.5 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">Kontrol Et ve Yayınla</button>
+              </div>` : paylasKutusu) : paylasKutusu}
+          </aside>
+          <div class="lg:col-span-7 space-y-3">${sekme === "firsat" ? firsatlar : akis}</div>
+        </div>
       `;
     }
 
@@ -4438,11 +4642,11 @@
 
     function renderCurrentView() {
       updateBasketHeaderBadge();
-      ["vitrin", "deals", "basket", "custom_basket", "scanner"].forEach(v => {
+      ["vitrin", "deals", "basket", "custom_basket", "scanner", "topluluk"].forEach(v => {
         const dt = document.getElementById("dtab-" + v);
         const isActive = appState.view === v || (v === "vitrin" && appState.view === "xray");
         if (dt) {
-          dt.className = "px-3.5 py-2 rounded-lg text-sm font-medium transition inline-flex items-center gap-1.5 " + (
+          dt.className = "px-3 xl:px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition inline-flex items-center gap-1.5 " + (
             isActive ? "bg-slate-100 text-slate-900 font-semibold" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
           );
         }
@@ -4466,6 +4670,7 @@
       else if (appState.view === "xray") container.innerHTML = renderXrayView();
       else if (appState.view === "scanner") container.innerHTML = renderScannerView();
       else if (appState.view === "deals") container.innerHTML = renderDealsView();
+      else if (appState.view === "topluluk") container.innerHTML = renderCommunityView();
       else container.innerHTML = renderPartnersView();
 
       if (activeId) {
@@ -4503,6 +4708,8 @@
           appState.view = "scanner";
         } else if (path === "/firsatlar" || path === "/firsatlar/") {
           appState.view = "deals";
+        } else if (path === "/topluluk" || path === "/topluluk/") {
+          appState.view = "topluluk";
         } else if (path.startsWith("/urun/")) {
           appState.view = "xray";
           if (!boot.initialProductKey) {
@@ -4557,6 +4764,9 @@
           await initCustomBasketPage();
         } else if (appState.view === "deals") {
           await loadDeals();
+          renderCurrentView();
+        } else if (appState.view === "topluluk") {
+          await loadCommunityFeed();
           renderCurrentView();
         } else if (appState.view === "xray") {
           await loadProductDetail(appState.selectedProductKey);

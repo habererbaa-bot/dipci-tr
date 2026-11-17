@@ -283,6 +283,8 @@ class SocialPostPayload(BaseModel):
     content: str
     coupon_code: str = ""
     usage_months: int = 0
+    seen_store: str = ""
+    seen_price: float = 0.0
 
 
 class ShareDealPayload(BaseModel):
@@ -524,6 +526,21 @@ def serve_deals_seo_page():
             canonical_url=f"{CANONICAL_ORIGIN}/firsatlar",
             json_ld_objects=build_organization_and_website_schema(),
             initial_view="deals",
+        ),
+        headers=NO_CACHE_HTML_HEADERS,
+    )
+
+
+@app.get("/topluluk", response_class=HTMLResponse)
+def serve_topluluk_page():
+    return HTMLResponse(
+        render_seo_hydrated_spa(
+            _read_index_template(),
+            title="Topluluk — Gördüğün Fiyatı Paylaş, Fırsatı Duyur | dipci.tr",
+            description="Onaylı dipci üyeleri markette ve mağazada gördükleri fiyatları paylaşıyor, fırsatları duyuruyor, ürünlere yorum yazıyor.",
+            canonical_url=f"{CANONICAL_ORIGIN}/topluluk",
+            json_ld_objects=build_organization_and_website_schema(),
+            initial_view="topluluk",
         ),
         headers=NO_CACHE_HTML_HEADERS,
     )
@@ -1701,7 +1718,15 @@ def api_create_social_post(
         content=payload.content,
         coupon_code=payload.coupon_code,
         usage_months=payload.usage_months,
+        seen_store=payload.seen_store,
+        seen_price=payload.seen_price,
     )
+
+
+@app.get("/api/social/feed")
+def api_social_feed(limit: int = 40):
+    """Topluluk akışı (Kemal, 17 Kas 2026): son yorumlar, gördüğüm fiyatlar, kupon notları + üye fırsatları."""
+    return {"ok": True, "posts": social_service.community_feed(limit), "deals": social_service.list_community_deals()}
 
 
 @app.post("/api/social/posts/{post_id}/helpful")
