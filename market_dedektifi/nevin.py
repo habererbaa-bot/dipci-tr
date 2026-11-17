@@ -217,8 +217,30 @@ def main() -> int:
     }
     CIKTI.mkdir(parents=True, exist_ok=True)
     (CIKTI / f"{simdi:%Y%m%d_%H%M%S}.json").write_text(json.dumps(cikti, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(json.dumps({"baslik": cikti["baslik"], "kelime": len(y["metin"].split())}, ensure_ascii=False))
+    durum = basincaya_gonder(cikti, f"dedektif:{simdi:%Y-%m-%d}")
+    print(json.dumps({"baslik": cikti["baslik"], "kelime": len(y["metin"].split()), "basinca": durum}, ensure_ascii=False))
     return 0
+
+
+def basincaya_gonder(cikti: dict, kaynak_id: str) -> str:
+    """Yazıyı basınca.com Market Dedektifi köşesine dipci kendisi ekler (Kemal, 17 Kas 2026).
+    Adres ve anahtar basınca tarafından verilir, .env'de durur; yoksa gönderilmez (basınca kendisi çeker)."""
+    adres = os.getenv("DEDEKTIF_YAYIN_ADRESI", "").strip()
+    anahtar = os.getenv("DEDEKTIF_YAYIN_ANAHTARI", "").strip()
+    if not adres or not anahtar:
+        return "yayin-adresi-yok"
+    duz = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"", cikti["markdown"])
+    govde = json.dumps({
+        "baslik": cikti["baslik"], "spot": cikti["ozet_spot"], "html": cikti["html"], "metin": duz,
+        "tarih": cikti["uretim_zamani"], "kaynak_id": kaynak_id, "yazar": cikti["yazar"],
+    }, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(adres, data=govde, method="POST", headers={
+        "content-type": "application/json", "authorization": f"Bearer {anahtar}", "user-agent": "dipci-nevin/1.0"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return f"gonderildi:{r.status}"
+    except Exception as e:
+        return f"hata:{str(e)[:120]}"
 
 
 if __name__ == "__main__":
