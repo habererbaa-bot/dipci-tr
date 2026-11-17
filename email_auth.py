@@ -88,6 +88,7 @@ class EmailOTPClient:
                 headers={
                     "Authorization": f"Bearer {self.resend_api_key}",
                     "Content-Type": "application/json",
+                    "User-Agent": "dipci-mailer/1.0",  # Resend, Python varsayılan kimliğini 403 ile engelliyor
                 },
                 method="POST",
             )
