@@ -1527,7 +1527,43 @@ class AutoCatalogEngine:
             "online_offers_persisted": offers_count,
         }
 
-    def enrich_online_offers(self, limit: int = 250, state_path: Optional[Path] = None, magaza: bool = False) -> Dict:
+    def _tazelik_tablosu(self) -> None:
+        self.db.conn.executescript(
+            """
+            CREATE TABLE IF NOT EXISTS online_tazelik (product_key TEXT PRIMARY KEY, son TEXT NOT NULL);
+            CREATE TABLE IF NOT EXISTS yenile_kuyrugu (product_key TEXT PRIMARY KEY, istendi TEXT NOT NULL);
+            """
+        )
+
+    def tazele_kuyruk(self, limit: int = 15, magaza: bool = True) -> Dict:
+        """Online fiyatı en çok gereken ürünleri yeniler (Kemal, 17 Kas 2026: "orada fiyat değiştiğinde bizde de değişiyor mu?"):
+        1) ziyaretçinin baktığı ve fiyatı 6 saatten eski ürünler (yenile_kuyrugu),
+        2) kalanı: temel ihtiyaçlardan (talep puanı yüksek) fiyatı 6 saatten eski olanlar."""
+        self._tazelik_tablosu()
+        import talep
+        talep.kaydet(self.db.conn)
+        kuyruk = [r[0] for r in self.db.conn.execute(
+            "SELECT product_key FROM yenile_kuyrugu ORDER BY istendi LIMIT ?", (limit,)).fetchall()]
+        if len(kuyruk) < limit:
+            kuyruk += [r[0] for r in self.db.conn.execute(
+                """SELECT i.product_key FROM product_catalog_index i
+                   LEFT JOIN online_tazelik t ON t.product_key = i.product_key
+                   WHERE (t.son IS NULL OR t.son < datetime('now', '-6 hours')) AND i.offer_count >= 2
+                     AND dipci_talep(i.search_norm, i.category) >= 80
+                   ORDER BY dipci_talep(i.search_norm, i.category) DESC, t.son LIMIT ?""",
+                (limit - len(kuyruk),)).fetchall() if r[0] not in kuyruk]
+        if not kuyruk:
+            return {"ok": True, "scanned": 0}
+        ph = ",".join("?" * len(kuyruk))
+        rows = self.db.conn.execute(
+            f"SELECT product_key, brand, family_name, category FROM product_catalog_index WHERE product_key IN ({ph})", kuyruk
+        ).fetchall()
+        self.db.conn.execute(f"DELETE FROM yenile_kuyrugu WHERE product_key IN ({ph})", kuyruk)
+        self.db.conn.commit()
+        return self.enrich_online_offers(limit=len(rows), magaza=magaza, batch_override=list(rows))
+
+    def enrich_online_offers(self, limit: int = 250, state_path: Optional[Path] = None, magaza: bool = False,
+                             batch_override: Optional[List] = None) -> Dict:
         """Katalogdaki market ürünlerine online mağaza (PTT AVM, n11, Hepsiburada, Amazon, Trendyol...) fiyatlarını ekler.
         Kemal 16 Kas 2026: Nescafe Gold'da PTT AVM ve n11 marketlerden ucuzdu ama kartta görünmüyordu.
         Her çalışmada sıradaki `limit` ürün taranır (dönüşümlü); Akakçe'yi yormamak için yavaş gider."""
@@ -1552,7 +1588,8 @@ class AutoCatalogEngine:
             start = int(state_path.read_text().strip() or 0) % len(rows)
         except Exception:
             start = 0
-        batch = [rows[(start + i) % len(rows)] for i in range(min(limit, len(rows)))]
+        batch = batch_override if batch_override is not None else [rows[(start + i) % len(rows)] for i in range(min(limit, len(rows)))]
+        self._tazelik_tablosu()
         enriched = 0
         offers_added = 0
         for r in batch:
@@ -1581,8 +1618,11 @@ class AutoCatalogEngine:
                 if pk:
                     enriched += 1
                     offers_added += len(offers)
-                # Her üründen sonra kaydet: uzun yazma kilidi siteyi ve radarı kilitliyordu (17 Kas 2026).
-                self.db.conn.commit()
+            self.db.conn.execute(
+                "INSERT INTO online_tazelik(product_key, son) VALUES (?, datetime('now')) "
+                "ON CONFLICT(product_key) DO UPDATE SET son = excluded.son", (r["product_key"],))
+            # Her üründen sonra kaydet: uzun yazma kilidi siteyi ve radarı kilitliyordu (17 Kas 2026).
+            self.db.conn.commit()
             time.sleep(1.2)
         self.db.conn.commit()
         if tarayici is not None:
@@ -1590,10 +1630,11 @@ class AutoCatalogEngine:
                 tarayici.__exit__(None, None, None)
             except Exception:
                 pass
-        try:
-            state_path.write_text(str((start + len(batch)) % len(rows)))
-        except Exception:
-            pass
+        if batch_override is None:
+            try:
+                state_path.write_text(str((start + len(batch)) % len(rows)))
+            except Exception:
+                pass
         indexed = self.db.rebuild_catalog_index()
         return {"ok": True, "elapsed_sec": round(time.time() - t0, 1), "scanned": len(batch),
                 "enriched": enriched, "online_offers_added": offers_added, "magaza_sitesi_teklif": magaza_eklenen, "indexed": indexed}
@@ -1644,6 +1685,7 @@ def main() -> None:
     parser.add_argument("--import-bundles", type=str, default="", help="Önceden çekilmiş JSON paketlerini içe aktar")
     parser.add_argument("--discover", type=str, default="", help="Tekil ürün sorgusunu keşfet ve kaydet")
     parser.add_argument("--enrich-online", type=int, default=0, help="Sıradaki N ürüne online mağaza fiyatı ekle")
+    parser.add_argument("--tazele", type=int, default=0, help="Bakılan ve temel ihtiyaç ürünlerinden fiyatı eskiyen N ürünü yenile")
     parser.add_argument("--magaza", action="store_true", help="Mağazaların kendi sitelerini de gerçek tarayıcıyla oku")
     args = parser.parse_args()
 
@@ -1673,6 +1715,9 @@ def main() -> None:
             print(json.dumps({"ok": True, "imported_bundles": imported, "reclassified": recl, "indexed": cnt}, ensure_ascii=False))
             return
 
+    if args.tazele:
+        print(json.dumps(engine.tazele_kuyruk(limit=args.tazele, magaza=args.magaza), ensure_ascii=False, indent=2))
+        return
     if args.enrich_online:
         print(json.dumps(engine.enrich_online_offers(limit=args.enrich_online, magaza=args.magaza), ensure_ascii=False, indent=2))
         return

@@ -1143,8 +1143,22 @@ def list_products(
     }
 
 
+def _tazelik_iste(product_key: str) -> None:
+    """Ziyaretçi bir ürüne baktı: online fiyatı 6 saatten eskiyse yenileme kuyruğuna al (dipci-tazele 5 dk'da bir işler)."""
+    try:
+        r = db.conn.execute(
+            "SELECT 1 FROM online_tazelik WHERE product_key = ? AND son >= datetime('now', '-6 hours')", (product_key,)
+        ).fetchone()
+        if not r:
+            db.conn.execute("INSERT OR IGNORE INTO yenile_kuyrugu(product_key, istendi) VALUES (?, datetime('now'))", (product_key,))
+            db.conn.commit()
+    except sqlite3.OperationalError:
+        pass  # tablo henüz yok ya da veritabanı meşgul: ziyaretçiyi bekletme
+
+
 @app.get("/api/products/{product_key}")
 def get_product_xray(product_key: str, request: Request):
+    _tazelik_iste(product_key)
     prod = db.conn.execute(
         "SELECT * FROM canonical_products WHERE product_key = ?", (product_key,)
     ).fetchone()
