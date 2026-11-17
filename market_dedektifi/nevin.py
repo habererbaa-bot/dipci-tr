@@ -22,6 +22,8 @@ from pathlib import Path
 ORIGIN = os.getenv("DIPCI_ORIGIN", "https://dipci.tr")
 CIKTI = Path(os.getenv("DEDEKTIF_CIKTI_KLASORU") or (Path(__file__).resolve().parent / "uretilen_yazilar"))
 MODEL = os.getenv("NEVIN_GEMINI_MODEL", "gemini-3.8-flash")
+# Ücretsiz katmanda biri doluysa (503/429) sıradakine geçilir.
+MODELLER = [MODEL] + [m for m in ("gemini-3.5-flash", "gemini-3.5-flash-lite") if m != MODEL]
 
 # Her türden birkaç ürün: şok indirim, gerçek indirim, fiyat farkı, indirim marketi, online kampanya...
 TURLER = [("sok", 3), ("dip", 3), ("fark", 2), ("indirim-marketi", 2), ("kampanya", 1), ("amazon", 1),
@@ -71,6 +73,16 @@ def urunleri_topla():
 
 
 def gemini(sistem: str, soru: str) -> str:
+    son = None
+    for m in MODELLER:
+        try:
+            return _gemini(m, sistem, soru)
+        except Exception as e:
+            son = e
+    raise RuntimeError(f"Gemini ücretsiz modellerin hepsi dolu: {son}")
+
+
+def _gemini(model: str, sistem: str, soru: str) -> str:
     anahtar = os.getenv("GEMINI_UCRETSIZ_KEY", "").strip()
     if not anahtar:
         raise RuntimeError("GEMINI_UCRETSIZ_KEY yok")
@@ -79,9 +91,9 @@ def gemini(sistem: str, soru: str) -> str:
         "contents": [{"role": "user", "parts": [{"text": soru}]}],
         "generationConfig": {"maxOutputTokens": 20000, "temperature": 0.95, "responseMimeType": "application/json"},
     }).encode("utf-8")
-    for i in range(5):
+    for i in range(3):
         req = urllib.request.Request(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
             data=govde, method="POST",
             headers={"content-type": "application/json", "x-goog-api-key": anahtar},
         )
@@ -140,6 +152,10 @@ def html_yap(metin: str, izinli: set) -> str:
 
 
 def main() -> int:
+    bugun = datetime.now().strftime("%Y%m%d")
+    if any(CIKTI.glob(f"{bugun}_*.json")):
+        print("Bugünün yazısı zaten var.")
+        return 0
     urunler = urunleri_topla()
     if len(urunler) < 6:
         print("Yeterli ürün yok, bugün yazı yok.")
@@ -156,7 +172,7 @@ def main() -> int:
         "ozet_spot": y.get("spot", "").strip(),
         "html": govde,
         "markdown": y["metin"],
-        "kullanilan_motor": f"gemini-ucretsiz:{MODEL}",
+        "kullanilan_motor": "gemini-ucretsiz",
         "urunler": urunler,
     }
     CIKTI.mkdir(parents=True, exist_ok=True)
