@@ -17,11 +17,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 # basınca kartı 3:4 dikey: matbaa 1152x1536 basıp 900x1200'e küçültüyor (Kemal, 17 Kas 2026).
 W, H = 900, 1200
-RW, RH = 1152, 1536
+RW, RH = 1800, 2400  # 2 kat büyük çizilip 900x1200'e küçültülür: yazılar ve görsel net olsun
 S = RW / W
 CANONICAL = "https://dipci.tr"
 ONLINE_PLATFORMS = ("amazon", "hepsiburada", "n11", "pttavm", "trendyol", "koctas", "pazarama", "idefix")
@@ -285,6 +285,21 @@ def _fetch_image(url: str) -> Optional[Image.Image]:
 _img_ok: Dict[str, tuple] = {}
 
 
+def _trim_white(im: Image.Image) -> Image.Image:
+    """Ürün fotoğrafının etrafındaki boş beyaz alanı kırpar (ürün kartta büyük görünsün)."""
+    try:
+        g = ImageChops.difference(im.convert("RGB"), Image.new("RGB", im.size, (255, 255, 255))).convert("L")
+        g = g.point(lambda v: 255 if v > 18 else 0)
+        bb = g.getbbox()
+        if not bb:
+            return im
+        pad = int(max(bb[2] - bb[0], bb[3] - bb[1]) * 0.03)
+        bb = (max(0, bb[0] - pad), max(0, bb[1] - pad), min(im.width, bb[2] + pad), min(im.height, bb[3] + pad))
+        return im.crop(bb)
+    except Exception:
+        return im
+
+
 def _image_ok(url: str) -> bool:
     """Reklamda görseli olmayan ürün çıkmasın; sonuç 6 saat hatırlanır."""
     if not url:
@@ -412,11 +427,24 @@ def render_card_png(db, fast_radar, kind: str, product_key: str) -> Optional[byt
     dr.rounded_rectangle([P(W - M) - tw - P(32), P(24), P(W - M), P(64)], radius=P(20), fill="#10B981")
     dr.text((P(W - M) - tw - P(16), P(32)), tag, font=tf, fill="#FFFFFF")
 
-    # Ürün görseli
-    box = (P(M), P(108), P(W - M), P(520))
+    # Yerleşim: mağaza satırları kartın dibine oturur, ad üstünde; kalan bütün yükseklik ürün görseline (boşluk kalmaz).
+    footer_top = P(H - 84)
+    n = min(len(quotes), 5)
+    row_h, gap = P(88), P(12)
+    rows_top = footer_top - P(24) - n * row_h - (n - 1) * gap
+    nf = F(36)
+    name_lines = _wrap(dr, r["family_name"] or "", nf, P(W - 2 * M), 2)
+    name_block = P(36) + len(name_lines) * P(46) + P(18)
+    name_top = rows_top - name_block
+    box = (P(M), P(104), P(W - M), name_top - P(16))
+
+    # Ürün görseli: fotoğraftaki boş beyaz kenarlar kırpılır, ürün kutuya sığacak kadar büyütülür ve netleştirilir.
+    pic = _trim_white(pic)
     bw, bh = box[2] - box[0], box[3] - box[1]
     sc = min(bw / pic.width, bh / pic.height)
     pic = pic.resize((max(1, int(pic.width * sc)), max(1, int(pic.height * sc))), Image.LANCZOS)
+    if sc > 1.2:
+        pic = pic.filter(ImageFilter.UnsharpMask(radius=2, percent=80, threshold=2))
     img.paste(pic, (box[0] + (bw - pic.width) // 2, box[1] + (bh - pic.height) // 2))
     badge = ev["badge"]
     if badge:
@@ -426,20 +454,15 @@ def render_card_png(db, fast_radar, kind: str, product_key: str) -> Optional[byt
         dr.text((box[0] + P(16), box[1] + P(10)), badge, font=bf, fill="#FFFFFF")
 
     # Ürün adı
-    y = P(544)
+    y = name_top
     dr.text((P(M), y), (r["brand"] or "").upper()[:34], font=F(22), fill="#64748B")
-    y += P(34)
-    nf = F(34)
-    for line in _wrap(dr, r["family_name"] or "", nf, P(W - 2 * M), 2):
+    y += P(36)
+    for line in name_lines:
         dr.text((P(M), y), line, font=nf, fill="#0F172A")
-        y += P(44)
-    y += P(12)
+        y += P(46)
 
-    # Fiyat satırları (3-5 mağaza), alt şeride kadar sığdırılır
-    footer_top = P(H - 84)
-    n = min(len(quotes), 5)
-    gap = P(10)
-    row_h = min(P(84), (footer_top - P(16) - y - gap * (n - 1)) // n)
+    # Fiyat satırları
+    y = rows_top
     for i, q in enumerate(quotes[:n]):
         name, bg, fg = BRANDS.get(q["platform"], DEFAULT_BRAND)
         top = y + i * (row_h + gap)
@@ -447,22 +470,22 @@ def render_card_png(db, fast_radar, kind: str, product_key: str) -> Optional[byt
         dr.rounded_rectangle([P(M), top, P(W - M), top + row_h], radius=P(14),
                              fill="#ECFDF5" if win else "#F8FAFC",
                              outline="#10B981" if win else "#E2E8F0", width=P(3) if win else P(2))
-        cf = F(24)
-        cw = dr.textlength(name, font=cf) + P(28)
-        ch = min(P(44), row_h - P(16))
+        cf = F(26)
+        cw = dr.textlength(name, font=cf) + P(30)
+        ch = P(48)
         cy = top + (row_h - ch) // 2
         dr.rounded_rectangle([P(M + 14), cy, P(M + 14) + cw, cy + ch], radius=P(10), fill=bg)
-        dr.text((P(M + 28), cy + (ch - P(26)) // 2), name, font=cf, fill=fg)
+        dr.text((P(M + 29), cy + (ch - P(28)) // 2), name, font=cf, fill=fg)
         ps = _tl(q["pack_price"])
-        pf = F(40 if win else 32)
-        ph = P(46 if win else 37)
+        pf = F(42 if win else 34)
+        ph = P(48 if win else 39)
         px = P(W - M - 18) - dr.textlength(ps, font=pf)
         dr.text((px, top + (row_h - ph) // 2), ps, font=pf, fill="#047857" if win else "#334155")
         if win:
-            lbl, lf2 = "EN UCUZ", F(18)
+            lbl, lf2 = "EN UCUZ", F(19)
             lx = P(M + 14) + cw + P(12)
             if lx + dr.textlength(lbl, font=lf2) < px - P(10):
-                dr.text((lx, top + (row_h - P(21)) // 2), lbl, font=lf2, fill="#059669")
+                dr.text((lx, top + (row_h - P(22)) // 2), lbl, font=lf2, fill="#059669")
 
     # Alt şerit
     dr.rectangle([0, footer_top, RW, RH], fill="#F1F5F9")
