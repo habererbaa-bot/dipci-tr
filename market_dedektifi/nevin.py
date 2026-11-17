@@ -233,7 +233,8 @@ def basinca_metni(markdown: str) -> str:
     """basınca köşe metni: dipci bağlantıları basınca'nın biçimiyle ⟦adres|yazı⟧ (yazının içinde tıklanır link olur)."""
     def bag(m):
         yazi, url = m.group(1), m.group(2)
-        if url.startswith("https://dipci.tr/"):
+        # basınca canlı sitesi ⟦adres|yazı⟧ işaretini çizebildiğinde açılır (BASINCA_LINK_ISARETI=1); yoksa düz yazı kalır.
+        if url.startswith("https://dipci.tr/") and os.getenv("BASINCA_LINK_ISARETI", "0") == "1":
             return "⟦" + url + "|" + yazi + "⟧"
         return yazi
     t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", bag, markdown)
