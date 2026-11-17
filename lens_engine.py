@@ -981,6 +981,19 @@ class DipciLensEngine:
 
     # ----------------- 2. CANLI ÇOKLU MAĞAZA EN DÜŞÜK FİYAT ARAMA KATMANI -----------------
 
+    @staticmethod
+    def _mf_good_enough(query: str, items: List[Dict]) -> bool:
+        toks = [t for t in re.split(r"\s+", _norm_tr(query)) if len(t) >= 3 and not re.search(r"\d", t)]
+        if not toks:
+            return True
+        need = max(1, math.ceil(len(toks) * 0.6))
+        head = toks[-1][:4]
+        for it in items:
+            tn = _norm_tr(f"{it.get('brand') or ''} {it.get('title') or ''}")
+            if sum(1 for t in toks if t in tn) >= need and head in tn:
+                return True
+        return False
+
     def _search_marketfiyati_live(
         self,
         query: str,
@@ -1024,11 +1037,14 @@ class DipciLensEngine:
                     )
                     with urllib.request.urlopen(req, timeout=8) as resp:
                         body = json.loads(resp.read().decode("utf-8", errors="replace"))
-                        items = body.get("content") or []
-                    if items:
-                        break
+                        got = body.get("content") or []
                 except Exception:
                     continue
+                seen_t = {str(x.get("title")) for x in items}
+                items.extend(x for x in got if str(x.get("title")) not in seen_t)
+                # Sorgu kelimelerinin çoğunu (ve ürün adını veren son kelimeyi) taşıyan sonuç geldiyse dur
+                if items and self._mf_good_enough(query, items):
+                    break
 
         if not items:
             return [], {}
@@ -1039,6 +1055,8 @@ class DipciLensEngine:
         ]
 
         # En alakalı referans ürünü ve paket gramajını seç
+        _wt = [t for t in q_tokens if not re.search(r"\d", t)]
+        q_head = _wt[-1][:4] if _wt else ""
         scored_items: List[Tuple[float, Dict, Optional[Tuple[float, str, str]]]] = []
         for it in items:
             title = str(it.get("title") or "").strip()
@@ -1051,6 +1069,8 @@ class DipciLensEngine:
 
             p_info = _extract_pack_info_from_text(f"{ref_w} {title}")
             score = matched_toks * 10.0 + len(it.get("productDepotInfoList") or []) * 1.5
+            if q_head and q_head in t_norm:
+                score += 15.0  # ürünün ne olduğunu söyleyen son kelime (süt / yoğurt) tutuyor
             if target_pack and p_info and p_info[1] == target_pack[1]:
                 ratio = p_info[0] / max(target_pack[0], 0.001)
                 if 0.80 <= ratio <= 1.25:
@@ -1157,7 +1177,12 @@ class DipciLensEngine:
                 per_market_best["sok"]["url"] = s_url
                 per_market_best["sok"]["is_direct_product"] = True
 
-        return list(per_market_best.values()), meta
+        out = list(per_market_best.values())
+        # Aynı ürünün bir markette 3 katı fiyatla görünmesi çoklu paket ya da yanlış eşleşmedir (Sek süt 42,5 TL iken Migros 139,95)
+        if len(out) >= 3:
+            med = statistics.median([x["price"] for x in out])
+            out = [x for x in out if 0.4 * med <= x["price"] <= 2.2 * med]
+        return out, meta
 
     def _search_online_marketplaces_live(
         self,
