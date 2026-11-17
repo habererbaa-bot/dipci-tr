@@ -79,7 +79,43 @@ def gemini(sistem: str, soru: str) -> str:
             return _gemini(m, sistem, soru)
         except Exception as e:
             son = e
-    raise RuntimeError(f"Gemini ücretsiz modellerin hepsi dolu: {son}")
+    # Yedek: dipci'nin fotoğraf aramasında zaten kullandığı ÜCRETSİZ Coarena modelleri.
+    for m in ("gemini-3-8-flash", "gpt-6-luna"):
+        try:
+            return _coarena(m, sistem, soru)
+        except Exception as e:
+            son = e
+    raise RuntimeError(f"Ücretsiz modellerin hepsi dolu: {son}")
+
+
+def _coarena(model: str, sistem: str, soru: str) -> str:
+    anahtar = os.getenv("COARENA_API_KEY", "").strip()
+    if not anahtar:
+        raise RuntimeError("COARENA_API_KEY yok")
+    govde = json.dumps({
+        "model": model,
+        "messages": [{"role": "system", "content": sistem}, {"role": "user", "content": soru}],
+        "temperature": 0.9,
+        "max_tokens": 8000,
+    }).encode("utf-8")
+    for i in range(3):
+        req = urllib.request.Request(
+            "https://coarena.ai/api/v1/chat/completions", data=govde, method="POST",
+            headers={"content-type": "application/json", "authorization": f"Bearer {anahtar}", "user-agent": "dipci-nevin/1.0"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=300) as r:
+                j = json.loads(r.read().decode("utf-8"))
+            return j["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503):
+                time.sleep(20 * (i + 1))
+                continue
+            raise
+        except (TimeoutError, urllib.error.URLError, OSError):
+            time.sleep(20 * (i + 1))
+            continue
+    raise RuntimeError("Coarena yoğun")
 
 
 def _gemini(model: str, sistem: str, soru: str) -> str:
