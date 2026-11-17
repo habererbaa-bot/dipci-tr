@@ -178,11 +178,18 @@ class SecurityHeadersMiddleware:
             await self.asgi_app(scope, receive, send)
             return
 
+        gomulu = scope.get("path", "").startswith("/reklam/kutu/")
+
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
                 headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"server"]
                 existing = {k.lower() for k, _ in headers}
-                headers.extend((k, v) for k, v in self.HEADERS if k not in existing)
+                if gomulu:
+                    # dipci reklam kutusu basınca'ya gömülür (Kemal, 17 Kas 2026)
+                    headers.append((b"content-security-policy", b"frame-ancestors 'self' https://basinca.com https://*.basinca.com"))
+                    headers.extend((k, v) for k, v in self.HEADERS if k not in existing and k != b"x-frame-options")
+                else:
+                    headers.extend((k, v) for k, v in self.HEADERS if k not in existing)
                 message = dict(message, headers=headers)
             await send(message)
 
@@ -651,6 +658,70 @@ def serve_dedektif_onizleme():
         f"{y.get('html', '')}</body></html>"
     )
     return HTMLResponse(sayfa, headers=NO_CACHE_HTML_HEADERS)
+
+
+@app.get("/reklam/kutu/{tur}", response_class=HTMLResponse)
+def serve_reklam_kutusu(tur: str, sure: int = 7):
+    """basınca'ya bir kez gömülen dipci reklam kutusu (Kemal, 17 Kas 2026).
+    Gösterilecek ürünü dipci seçer: ürünleri sırayla döndürür, 1 dakikada bir yeniler; olağanüstü fiyat düşüşü
+    ya da yeni kampanya çıkınca hemen ona geçer. basınca tarafında kod değişmez."""
+    import basinca_ads
+    if tur not in basinca_ads.KINDS and tur != "karisik":
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    sure = max(4, min(int(sure or 7), 60))
+    sayfa = """<!DOCTYPE html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dipci.tr</title><style>
+html,body{margin:0;height:100%;background:#fff;overflow:hidden}
+a{display:block;width:100%;height:100%}
+img{display:block;width:100%;height:100%;object-fit:contain;transition:opacity .3s ease}
+img.g{opacity:0}
+</style></head><body><a id="a" href="https://dipci.tr" target="_blank" rel="noopener"><img id="i" alt="dipci.tr"></a>
+<script>
+(function(){
+var TUR=__TUR__, SURE=__SURE__*1000, liste=[], i=0, gorulen={}, zaman=null;
+var a=document.getElementById("a"), im=document.getElementById("i");
+function goster(it){ if(!it) return; im.classList.add("g");
+  var y=new Image(); y.onload=function(){ im.src=it.gorsel; im.alt=it.baslik; a.href=it.link; im.classList.remove("g"); };
+  y.src=it.gorsel; }
+function sonraki(){ if(!liste.length) return; i=(i+1)%liste.length; goster(liste[i]); }
+function yukle(ilk){
+  fetch("/api/basinca/reklamlar?tur="+encodeURIComponent(TUR)+"&limit=12",{cache:"no-store"}).then(function(r){return r.json();}).then(function(d){
+    var yeni=(d&&d.items)||[]; if(!yeni.length) return;
+    var acil=null;
+    yeni.forEach(function(it){ if(it.acil && !gorulen[it.id]) acil=acil||it; });
+    yeni.forEach(function(it){ gorulen[it.id]=1; });
+    liste=yeni;
+    if(ilk||acil){ i=acil?liste.indexOf(acil):0; goster(liste[i]); clearInterval(zaman); zaman=setInterval(sonraki,SURE); }
+  }).catch(function(){});
+}
+yukle(true); setInterval(function(){yukle(false);},60000);
+})();
+</script></body></html>""".replace("__TUR__", json.dumps(tur)).replace("__SURE__", str(sure))
+    return HTMLResponse(sayfa, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/reklam/kart/{tur}.png")
+def serve_reklam_simdiki_kart(tur: str):
+    """Sabit görsel adresi: her istekte dipci'nin o an seçtiği ürünün kartı (20 sn'lik dilimle döner)."""
+    import basinca_ads
+    if tur not in basinca_ads.KINDS:
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    it = basinca_ads.current_slot(db, tur)
+    if not it:
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    png = basinca_ads.render_card_png(db, fast_radar, tur, it["id"][len(f"dipci-{tur}-"):])
+    if not png:
+        raise HTTPException(status_code=404, detail="Bulunamadı")
+    return Response(png, media_type="image/png", headers={"Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"})
+
+
+@app.get("/reklam/git/{tur}")
+def serve_reklam_simdiki_link(tur: str):
+    """Sabit tıklama adresi: o an gösterilen ürünün dipci sayfasına yönlendirir."""
+    import basinca_ads
+    from fastapi.responses import RedirectResponse
+    it = basinca_ads.current_slot(db, tur) if tur in basinca_ads.KINDS else None
+    return RedirectResponse(it["link"] if it else "https://dipci.tr/?utm_source=basinca", status_code=302, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/reklam/basinca.js")

@@ -514,7 +514,43 @@ _refreshing: set = set()
 # Aynı ürün iki karta birden düşmesin: önce şok, sonra diğerleri; bir türe giren ürün sonrakilere girmez.
 POOL_ORDER = ("sok", "dip", "fark", "indirim-marketi", "amazon", "kampanya", "temizlik-bakim", "teknoloji-ev")
 _pool_lock = threading.Lock()
-POOL_SECONDS = 900
+POOL_SECONDS = 300  # 5 dakikada bir tazele: yeni kampanya ve ani düşüş hemen girsin
+
+
+ILK_GORULME = Path(__file__).resolve().parent / "data" / "reklam_ilk_gorulme.json"
+ACIL_SAAT = 3
+
+
+def _acil_isaretle(db, items_by_kind: Dict[str, List[Dict]]) -> None:
+    """Olağanüstü fiyat düşüşü (son 3 saatte %40+) ya da yeni giren kampanya ürünü 'acil' olur ve öne geçer."""
+    try:
+        ilk = json.loads(ILK_GORULME.read_text(encoding="utf-8")) if ILK_GORULME.exists() else None
+    except Exception:
+        ilk = None
+    simdi = time.time()
+    ilk_kayit = ilk is None
+    ilk = ilk or {}
+    sinir = datetime.fromtimestamp(simdi - ACIL_SAAT * 3600).isoformat()
+    for k, items in items_by_kind.items():
+        for it in items:
+            it["acil"] = False
+            key = it["id"]
+            if key not in ilk:
+                ilk[key] = simdi
+            pk = key[len(f"dipci-{k}-"):]
+            d = db.conn.execute(
+                "SELECT drop_pct FROM live_price_drops WHERE product_key = ? AND detected_at > ? AND drop_pct >= 40", (pk, sinir)
+            ).fetchone()
+            if d:
+                it["acil"], it["acil_neden"] = True, "olağanüstü fiyat düşüşü"
+            elif not ilk_kayit and k in ("kampanya", "amazon", "indirim-marketi", "fark", "teknoloji-ev") and simdi - ilk[key] < ACIL_SAAT * 3600:
+                it["acil"], it["acil_neden"] = True, "yeni kampanya"
+    # 3 günden eski kayıtları unut (dosya şişmesin)
+    ilk = {k: v for k, v in ilk.items() if simdi - v < 3 * 86400}
+    try:
+        ILK_GORULME.write_text(json.dumps(ilk), encoding="utf-8")
+    except Exception:
+        pass
 
 
 def _build_all_pools(db) -> None:
@@ -524,8 +560,10 @@ def _build_all_pools(db) -> None:
         items = list_ads(db, None, k, 30, exclude=used)
         for it in items:
             used.add(it["id"][len(f"dipci-{k}-"):])
-        yeni[k] = (time.time(), items)
-    _pool.update(yeni)
+        yeni[k] = items
+    _acil_isaretle(db, yeni)
+    t = time.time()
+    _pool.update({k: (t, v) for k, v in yeni.items()})
 
 
 def warm_pools(db) -> None:
@@ -563,10 +601,25 @@ def rotating_ads(db, fast_radar, kind: str, limit: int) -> List[Dict]:
     for k in kinds:
         items = list(_pool.get(k, (0, []))[1])
         random.shuffle(items)
+        # Acil olanlar (olağanüstü düşüş, yeni kampanya) en öne
+        items.sort(key=lambda it: 0 if it.get("acil") else 1)
         picked.append(items)
     out = []
     for i in range(max((len(x) for x in picked), default=0)):
         for x in picked:
             if i < len(x):
                 out.append(x[i])
+    out.sort(key=lambda it: 0 if it.get("acil") else 1)
     return out[:limit]
+
+
+def current_slot(db, kind: str, saniye: int = 20) -> Optional[Dict]:
+    """Sabit adresli kart için şu anki ürün: acil varsa o, yoksa havuzda zamana göre sırayla döner.
+    Görsel ve tıklama adresi aynı ürünü göstersin diye seçim saate bağlı (20 saniyelik dilim)."""
+    rotating_ads(db, None, kind, 1)  # havuzu hazırla/tazele
+    items = list(_pool.get(kind, (0, []))[1])
+    if not items:
+        return None
+    acil = [it for it in items if it.get("acil")]
+    liste = acil or items
+    return liste[int(time.time() // saniye) % len(liste)]
