@@ -80,7 +80,7 @@ def gemini(sistem: str, soru: str) -> str:
         except Exception as e:
             son = e
     # Yedek: dipci'nin fotoğraf aramasında zaten kullandığı ÜCRETSİZ Coarena modelleri.
-    for m in ("gemini-3-8-flash", "gpt-6-luna"):
+    for m in ("deepseek-v4-1-flash-1017", "gemini-3-8-flash", "gpt-6-luna"):
         try:
             return _coarena(m, sistem, soru)
         except Exception as e:
@@ -97,6 +97,9 @@ def _coarena(model: str, sistem: str, soru: str) -> str:
         "messages": [{"role": "system", "content": sistem}, {"role": "user", "content": soru}],
         "temperature": 0.9,
         "max_tokens": 8000,
+        # Coarena notu (ORTAK/COARENA-AYAR.md): gönderilmezse içerik sık sık boş döner.
+        "reasoning_effort": "none",
+        "response_format": {"type": "json_object"},
     }).encode("utf-8")
     for i in range(3):
         req = urllib.request.Request(
