@@ -564,13 +564,16 @@ def _build_all_pools(db) -> None:
     _acil_isaretle(db, yeni)
     t = time.time()
     _pool.update({k: (t, v) for k, v in yeni.items()})
-    # Kart görsellerini önceden çiz: okur kutuyu açınca beklemesin.
-    for k, items in yeni.items():
-        for it in items:
-            try:
-                render_card_png(db, None, k, it["id"][len(f"dipci-{k}-"):])
-            except Exception:
-                pass
+    # Kart görsellerini arka planda önceden çiz: okur kutuyu açınca beklemesin (havuz kilidini tutmadan).
+    def _ciz():
+        for k, items in yeni.items():
+            for it in items:
+                try:
+                    render_card_png(db, None, k, it["id"][len(f"dipci-{k}-"):])
+                except Exception:
+                    pass
+
+    threading.Thread(target=_ciz, daemon=True).start()
 
 
 def warm_pools(db) -> None:
