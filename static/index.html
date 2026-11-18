@@ -100,6 +100,9 @@
           <button onclick="switchMainView('custom_basket')" id="dtab-custom_basket" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Kendi Sepetim
           </button>
+          <button onclick="switchMainView('koli')" id="dtab-koli" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
+            Koli
+          </button>
           <button onclick="switchMainView('topluluk')" id="dtab-topluluk" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Topluluk
           </button>
@@ -166,6 +169,7 @@
           <a href="/kategori/ev-yasam-mutfak" onclick="event.preventDefault();filterCategory('ev_yasam_mutfak')" class="hover:text-slate-900">Ev Aletleri</a>
           <a href="/kategori/evcil-hayvan" onclick="event.preventDefault();filterCategory('evcil_hayvan')" class="hover:text-slate-900">Petshop</a>
           <a href="/firsatlar" onclick="event.preventDefault();switchMainView('deals')" class="text-emerald-700 hover:text-emerald-800">Gerçek İndirim Radarı</a>
+          <a href="/koli" onclick="event.preventDefault();switchMainView('koli')" class="text-amber-700 hover:text-amber-800">Koli Fiyatları</a>
           <button type="button" onclick="switchMainView('partners')" class="hover:text-slate-900">Mağaza XML Başvurusu</button>
           <a href="/kurumsal" class="hover:text-slate-900">Kurumsal İlkeler</a>
           <a href="/api/dedektif/rss.xml" target="_blank" class="text-slate-400 hover:text-slate-700">İndirim RSS</a>
@@ -1215,6 +1219,74 @@
       renderCurrentView();
     }
 
+    // Koli / çoklu satış incelemesi (Kemal, 18 Kas 2026)
+    async function loadKoli() {
+      const f = appState.koliFiltre || "hepsi";
+      const { data } = await apiFetch("/api/koli?filtre=" + f);
+      appState.koli = data || { koliler: [] };
+    }
+
+    function setKoliFiltre(f) {
+      appState.koliFiltre = f;
+      loadKoli().then(renderCurrentView);
+    }
+
+    function renderKoliView() {
+      const d = appState.koli;
+      if (!d) return `<div class="p-8 text-center text-sm text-slate-500 bg-white rounded-2xl border border-slate-200">Koli fiyatları yükleniyor...</div>`;
+      const tl = v => Number(v).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+      const f = appState.koliFiltre || "hepsi";
+      const btn = (k, label, cls) => `<button onclick="setKoliFiltre('${k}')" class="px-3.5 py-2 rounded-lg text-sm font-semibold border transition ${f === k ? cls : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}">${label}</button>`;
+      const kart = x => {
+        const ucuz = x.durum === "ucuz";
+        return `
+        <div class="rounded-2xl bg-white border-2 ${ucuz ? 'border-emerald-500' : 'border-rose-500'} overflow-hidden flex flex-col">
+          <div class="px-4 py-2 ${ucuz ? 'bg-emerald-600' : 'bg-rose-600'} text-white text-sm font-bold flex items-center justify-between gap-2">
+            <span>${ucuz ? '✓ Koli avantajlı' : '✗ Koli pahalı'}</span>
+            <span class="num">Tanesi ${tl(Math.abs(x.tane_fark))} ${ucuz ? 'ucuz' : 'pahalı'} (%${Math.abs(x.fark_yuzde).toLocaleString("tr-TR")})</span>
+          </div>
+          <div class="p-4 flex gap-3 flex-1">
+            ${x.image_url ? `<img src="${escapeHtml(x.image_url)}" alt="" loading="lazy" class="w-20 h-20 object-contain shrink-0 rounded-lg bg-slate-50" onerror="this.style.display='none'">` : ""}
+            <div class="min-w-0 flex-1">
+              <a href="${escapeHtml(x.seo_url)}" class="font-semibold text-[15px] text-slate-900 hover:underline leading-snug block">${escapeHtml(x.brand)} ${escapeHtml(x.family_name)}</a>
+              <div class="text-xs text-slate-500 mt-1 truncate">${escapeHtml(x.title || "")}</div>
+              <div class="mt-3 grid grid-cols-2 gap-2 text-sm">
+                <div class="rounded-lg ${ucuz ? 'bg-emerald-50 border border-emerald-200' : 'bg-rose-50 border border-rose-200'} p-2">
+                  <div class="text-[11px] text-slate-600 font-medium">Koli: ${escapeHtml(x.seller_name)}</div>
+                  <div class="font-bold num ${ucuz ? 'text-emerald-700' : 'text-rose-700'}">Tanesi ${tl(x.tane_fiyat)}</div>
+                  <div class="text-[11px] text-slate-600 num">${x.adet} adet: ${tl(x.koli_fiyat)}</div>
+                </div>
+                <div class="rounded-lg bg-slate-50 border border-slate-200 p-2">
+                  <div class="text-[11px] text-slate-600 font-medium">Tek alım en ucuz${x.tekli_satici ? ": " + escapeHtml(x.tekli_satici) : ""}</div>
+                  <div class="font-bold num text-slate-900">${tl(x.tekli_en_ucuz)}</div>
+                  <div class="text-[11px] text-slate-600 num">${x.adet} tane: ${tl(x.tekli_en_ucuz * x.adet)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="px-4 pb-4 flex gap-2">
+            <a href="${escapeHtml(x.seo_url)}" class="flex-1 text-center px-3 py-2 rounded-lg border border-slate-300 text-slate-800 text-sm font-medium hover:bg-slate-50">Tüm fiyatlar</a>
+            ${x.tracked_url ? `<a href="${escapeHtml(x.tracked_url)}" target="_blank" rel="noopener" class="flex-1 text-center px-3 py-2 rounded-lg ${ucuz ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-slate-900 hover:bg-slate-800'} text-white text-sm font-medium">Koliye git ↗</a>` : ""}
+          </div>
+        </div>`;
+      };
+      return `
+        <section class="space-y-4">
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900">📦 Koli ve Toplu Alım Fiyatları</h1>
+            <p class="text-sm text-slate-600 mt-1">Her kolinin tane fiyatı, aynı ürünün tek alımdaki en ucuz fiyatıyla karşılaştırılır. <strong class="text-emerald-700">Yeşil</strong>: koli avantajlı, <strong class="text-rose-700">kırmızı</strong>: tek tek almak daha ucuz.</p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            ${btn("hepsi", "Hepsi (" + (d.toplam || 0) + ")", "bg-slate-900 text-white border-slate-900")}
+            ${btn("ucuz", "✓ Avantajlı" + (f === "hepsi" ? " (" + (d.ucuz || 0) + ")" : ""), "bg-emerald-600 text-white border-emerald-600")}
+            ${btn("pahali", "✗ Pahalı" + (f === "hepsi" ? " (" + (d.pahali || 0) + ")" : ""), "bg-rose-600 text-white border-rose-600")}
+          </div>
+          ${(d.koliler || []).length
+            ? `<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">${d.koliler.map(kart).join("")}</div>`
+            : `<div class="p-8 text-center text-sm text-slate-500 bg-white rounded-2xl border border-slate-200">Bu filtrede koli satışı yok.</div>`}
+        </section>`;
+    }
+
     async function loadDeals() {
       await Promise.all([
         loadLivePriceDrops(),
@@ -1273,6 +1345,12 @@
         }
         document.title = "Topluluk — Gördüğün Fiyatı Paylaş, Fırsatı Duyur | dipci.tr";
         await loadCommunityFeed();
+      } else if (viewName === "koli") {
+        if (window.history && window.history.replaceState) {
+          window.history.replaceState(null, "", "/koli");
+        }
+        document.title = "Koli ve Toplu Alım Fiyatları — Tanesi Kaça Geliyor? | dipci.tr";
+        await loadKoli();
       } else if (viewName === "deals") {
         if (window.history && window.history.replaceState) {
           window.history.replaceState(null, "", "/firsatlar");
@@ -4699,7 +4777,7 @@
 
     function renderCurrentView() {
       updateBasketHeaderBadge();
-      ["vitrin", "deals", "basket", "custom_basket", "scanner", "topluluk"].forEach(v => {
+      ["vitrin", "deals", "basket", "custom_basket", "scanner", "topluluk", "koli"].forEach(v => {
         const dt = document.getElementById("dtab-" + v);
         const isActive = appState.view === v || (v === "vitrin" && appState.view === "xray");
         if (dt) {
@@ -4728,6 +4806,7 @@
       else if (appState.view === "scanner") container.innerHTML = renderScannerView();
       else if (appState.view === "deals") container.innerHTML = renderDealsView();
       else if (appState.view === "topluluk") container.innerHTML = renderCommunityView();
+      else if (appState.view === "koli") container.innerHTML = renderKoliView();
       else container.innerHTML = renderPartnersView();
 
       if (activeId) {
@@ -4767,6 +4846,8 @@
           appState.view = "deals";
         } else if (path === "/topluluk" || path === "/topluluk/") {
           appState.view = "topluluk";
+        } else if (path === "/koli" || path === "/koli/") {
+          appState.view = "koli";
         } else if (path.startsWith("/urun/")) {
           appState.view = "xray";
           if (!boot.initialProductKey) {
@@ -4826,6 +4907,9 @@
           renderCurrentView();
         } else if (appState.view === "topluluk") {
           await loadCommunityFeed();
+          renderCurrentView();
+        } else if (appState.view === "koli") {
+          await loadKoli();
           renderCurrentView();
         } else if (appState.view === "xray") {
           await loadProductDetail(appState.selectedProductKey);

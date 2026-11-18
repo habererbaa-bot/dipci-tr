@@ -38,6 +38,7 @@ from seo_engine import (
     CANONICAL_ORIGIN,
     CATEGORY_META,
     INDEXNOW_KEY,
+    key_to_slug,
     build_barcodes_sitemap_xml,
     build_categories_sitemap_xml,
     build_corporate_identity_html,
@@ -531,6 +532,57 @@ def serve_deals_seo_page():
         ),
         headers=NO_CACHE_HTML_HEADERS,
     )
+
+
+@app.get("/koli", response_class=HTMLResponse)
+def serve_koli_page():
+    return HTMLResponse(
+        render_seo_hydrated_spa(
+            _read_index_template(),
+            title="Koli ve Toplu Alım Fiyatları — Tanesi Kaça Geliyor? | dipci.tr",
+            description="Koli ve çoklu paket satışlarının tane fiyatı, aynı ürünün en ucuz tekli fiyatıyla karşılaştırılır: avantajlı koliler yeşil, pahalı olanlar kırmızı.",
+            canonical_url=f"{CANONICAL_ORIGIN}/koli",
+            json_ld_objects=build_organization_and_website_schema(),
+            initial_view="koli",
+        ),
+        headers=NO_CACHE_HTML_HEADERS,
+    )
+
+
+@app.get("/api/koli")
+def api_koli(filtre: str = "hepsi", category: str = "", limit: int = 300):
+    """Koli/çoklu satış incelemesi (Kemal, 18 Kas 2026): her kolinin tane fiyatı, aynı ürünün en ucuz tekli
+    satışıyla karşılaştırılır. Yeşil = koli avantajlı, kırmızı = koli pahalı."""
+    try:
+        rows = db.conn.execute(
+            """SELECT k.product_key, k.platform, k.seller_name, k.title, k.price, k.adet, k.birim_fiyat, k.url,
+                      i.brand, i.family_name, i.image_url, i.category, i.best_pack_price, i.best_seller_name
+               FROM koli_teklifleri k JOIN product_catalog_index i ON i.product_key = k.product_key
+               WHERE k.captured_at >= date('now', '-14 days') AND i.best_pack_price > 0"""
+            + (" AND i.category = ?" if category else ""),
+            ((category,) if category else ()),
+        ).fetchall()
+    except Exception:
+        rows = []
+    out = []
+    for r in rows:
+        tekli = float(r["best_pack_price"])
+        fark = round(tekli - float(r["birim_fiyat"]), 2)  # + : koli tanesi daha ucuz
+        oran = round(fark / tekli * 100, 1) if tekli else 0.0
+        durum = "ucuz" if fark > 0.01 else "pahali"
+        if filtre in ("ucuz", "pahali") and durum != filtre:
+            continue
+        out.append({
+            "product_key": r["product_key"], "brand": r["brand"], "family_name": r["family_name"],
+            "image_url": r["image_url"] or "", "category": r["category"], "seller_name": r["seller_name"] or r["platform"],
+            "title": r["title"], "koli_fiyat": r["price"], "adet": r["adet"], "tane_fiyat": r["birim_fiyat"],
+            "tekli_en_ucuz": tekli, "tekli_satici": r["best_seller_name"] or "", "tane_fark": fark, "fark_yuzde": oran,
+            "durum": durum, "seo_url": f"/urun/{key_to_slug(r['product_key'])}",
+            "tracked_url": affiliate_builder.build_tracking_url(r["url"], sub_id="dipci_koli") if r["url"] else "",
+        })
+    out.sort(key=lambda x: (0 if x["durum"] == "ucuz" else 1, -abs(x["fark_yuzde"])))
+    return {"ok": True, "toplam": len(out), "ucuz": sum(1 for x in out if x["durum"] == "ucuz"),
+            "pahali": sum(1 for x in out if x["durum"] == "pahali"), "koliler": out[: max(1, min(int(limit), 600))]}
 
 
 @app.get("/topluluk", response_class=HTMLResponse)
