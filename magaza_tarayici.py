@@ -139,7 +139,14 @@ class MagazaTarayici:
         from playwright.sync_api import sync_playwright
         tr = os.getenv("TR_PROXY_URL", "").strip()
         proxy = None
-        if tr:
+        try:
+            from ev_baglanti import tunel_acik, EV_PORT
+            ev = tunel_acik()
+        except Exception:
+            ev = False
+        if ev:  # önce Kemal'in ev interneti (18 Kas 2026), yoksa ISP proxy'si
+            proxy = {"server": f"http://127.0.0.1:{EV_PORT}"}
+        elif tr:
             u = urllib.parse.urlsplit(tr)
             proxy = {"server": f"http://{u.hostname}:{u.port}",
                      "username": urllib.parse.unquote(u.username or ""), "password": urllib.parse.unquote(u.password or "")}

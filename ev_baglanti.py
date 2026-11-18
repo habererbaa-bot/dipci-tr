@@ -41,7 +41,12 @@ class _EvYonlendirici(urllib.request.BaseHandler):
     def _yonlendir(self, req):
         if getattr(req, "_tunnel_host", None) or not _izinli(req.host):
             return None
-        # 1) Türkiye ISP proxy'si (.env TR_PROXY_URL; Kemal 17 Kas 2026'da aldı) — bilgisayar kapalıyken de çalışır
+        # 1) Kemal'in ev interneti (SSH tüneli açıksa) — Kemal, 18 Kas 2026: "fiyatların güncellenmesi için benim
+        #    bilgisayarımı kullan" (ISP proxy'si Akakçe'de 429 yedi)
+        if tunel_acik():
+            req.set_proxy(f"127.0.0.1:{EV_PORT}", "http")
+            return None
+        # 2) Yedek: Türkiye ISP proxy'si (.env TR_PROXY_URL) — bilgisayar kapalıyken
         tr = os.getenv("TR_PROXY_URL", "").strip()
         if tr:
             u = urllib.parse.urlsplit(tr)
@@ -49,9 +54,6 @@ class _EvYonlendirici(urllib.request.BaseHandler):
             if u.username:
                 kimlik = f"{urllib.parse.unquote(u.username)}:{urllib.parse.unquote(u.password or '')}"
                 req.add_header("Proxy-Authorization", "Basic " + base64.b64encode(kimlik.encode()).decode())
-        # 2) Yedek: Kemal'in ev interneti (SSH tüneli açıksa)
-        elif tunel_acik():
-            req.set_proxy(f"127.0.0.1:{EV_PORT}", "http")
         return None  # isteği asıl HTTPS işleyicisi göndersin
 
     https_open = _yonlendir
