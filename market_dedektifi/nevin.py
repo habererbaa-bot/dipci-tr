@@ -36,6 +36,7 @@ KARAKTER = "\n".join([
     "Örneklerinde KİŞİ ADI kullanmazsın (\"bir komşum\", \"bir arkadaşım\" dersin).",
     "Yapay zekâ gibi yazmazsın: madde listesi, tablo, başlıklı bölüm, kalın yazı, \"sonuç olarak\", \"unutmayın ki\", \"özetle\" gibi kalıplar yok. Cümle uzunlukların değişir; bazen kısa bir cümleyle vurgu yaparsın.",
     "Kitap, dergi gibi kültür ürünlerini fiyatı ucuz diye ÖNERMEZSİN; kitap fiyatıyla ölçülmez (Kemal, 18 Kas 2026).",
+    "Yazım kuralı: virgülden sonra gelen kelime (özel ad değilse) küçük harfle başlar: \"bereketi de artıyor dostlar\" ya da \"…artıyor, dostlar.\" — \", Dostlar\" YAZILMAZ. Yalnız yazının ilk kelimesi \"Dostlar,\" büyük harfle başlar.",
     "Okura ASLA \"pazarlık edin\" demezsin: marketlerde ve online mağazalarda fiyat sabittir, pazarlık olmaz (Kemal, 17 Kas 2026). Bunun yerine mağazaları karşılaştırmayı, en ucuz yeri seçmeyi önerirsin.",
     "YALNIZ sana verilen ürün, fiyat ve mağaza bilgilerini kullanırsın; fiyat, kampanya, mağaza ya da indirim UYDURMAZSIN.",
     "Fiyatların gün içinde değişebileceğini bir yerde doğal bir dille hatırlatırsın. Marka kötülemez, hakaret etmezsin.",
@@ -69,7 +70,7 @@ def _cins(link: str) -> str:
 # Kemal, 18 Kas 2026: "kitabın ucuzu yazılmaz... etik değil... kitap fiyatıyla ölçülmemeli". Kitaplar ucuz diye
 # önerilmez. (Okurların çok beğendiği popüler kitap indirime girerse yazı sonunda anılabilir; bunun için güvenilir
 # beğeni verisi gelene kadar kitap hiç alınmaz.)
-_KITAP = re.compile(r"^[^\d]+ - [A-ZÇĞİÖŞÜ][a-zçğıöşü'’]+(?: [A-ZÇĞİÖŞÜ][a-zçğıöşü'’.]+){1,3}$|(kitap|roman|hikaye|şiir|ciltli|karton kapak|yayınları|yayınevi)", re.I)
+_KITAP = re.compile(r"^[^\d]+ - [A-ZÇĞİÖŞÜ][a-zçğıöşü'’]+(?: [A-ZÇĞİÖŞÜ][a-zçğıöşü'’.]+){1,3}$|\b(kitap|roman|hikaye|şiir|ciltli|karton kapak|yayınları|yayınevi)\b", re.I)
 
 
 def kitap_mi(ad: str) -> bool:
@@ -184,6 +185,12 @@ def _gemini(model: str, sistem: str, soru: str) -> str:
     raise RuntimeError("Gemini ücretsiz: yoğunluk geçmedi")
 
 
+def yazim_duzelt(t: str) -> str:
+    """Kemal, 18 Kas 2026: "bereketi de artıyor, Dostlar olmaz... virgülden sonra gelen kelimenin baş harfi büyük olmaz".
+    Hitap sözleri cümle ortasında/sonunda küçük harfle yazılır (özel adlar dokunulmaz)."""
+    return re.sub(r"([,;:–—-]\s*)(Dostlar|Sevgili dostlar|Arkadaşlar|Komşular)\b", lambda m: m.group(1) + m.group(2)[0].lower() + m.group(2)[1:], t)
+
+
 def yaz(urunler):
     tarih = datetime.now().strftime("%d.%m.%Y")
     bilgi = "\n".join(
@@ -201,6 +208,7 @@ def yaz(urunler):
     ])
     cevap = gemini(KARAKTER, soru)
     y = json.loads(cevap[cevap.index("{"): cevap.rindex("}") + 1])
+    y["metin"] = yazim_duzelt(y.get("metin") or "")
     if not y.get("metin") or len(y["metin"]) < 1500:
         raise RuntimeError("Yazı kısa ya da boş geldi")
     return y
