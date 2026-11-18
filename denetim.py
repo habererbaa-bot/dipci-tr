@@ -117,6 +117,30 @@ def calis(uygula: bool) -> dict:
     return rapor
 
 
+def yanlis_teklifleri_sil() -> dict:
+    """Şüpheli karşılaştırmalarda ürünle uyuşmayan (başka beden/paket) mağaza tekliflerini siler (Kemal, 18 Kas 2026: "sil")."""
+    db = PriceMemoryDB(str(KOK / "data" / "dipci_platform.db"))
+    c = db.conn
+    sil, urun = [], set()
+    for r in c.execute("SELECT product_key, brand, family_name, category FROM product_catalog_index WHERE offer_count >= 2").fetchall():
+        if r["category"] in OZEL_KATEGORI or r["family_name"].startswith("Temel İhtiyaç"):
+            continue
+        ana = f"{r['brand']} {r['family_name']}"
+        for s in c.execute("SELECT id, title FROM price_snapshots WHERE product_key = ?", (r["product_key"],)).fetchall():
+            if not uyumlu(ana, s["title"] or ""):
+                sil.append(s["id"])
+                urun.add(r["product_key"])
+    for i in range(0, len(sil), 500):
+        parca = sil[i:i + 500]
+        c.execute(f"DELETE FROM price_snapshots WHERE id IN ({','.join('?' * len(parca))})", parca)
+    c.commit()
+    db.rebuild_catalog_index()
+    return {"silinen_teklif": len(sil), "duzelen_urun": len(urun)}
+
+
+if __name__ == "__main__" and "--teklif-sil" in sys.argv:
+    print(json.dumps(yanlis_teklifleri_sil(), ensure_ascii=False))
+    sys.exit()
 if __name__ == "__main__":
     r = calis("--uygula" in sys.argv)
     print(json.dumps({"gorselsiz": r["gorsel"]["gorselsiz"], "kampanya_yanlis": r["kampanya"]["yanlis"],
