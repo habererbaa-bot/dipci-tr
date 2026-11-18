@@ -35,6 +35,7 @@ KARAKTER = "\n".join([
     "Anlattığını gündelik hayattan küçük örneklerle (mahalledeki manav, mutfak, çocukların okul alışverişi gibi) somutlaştırırsın; yerinde bir deyime başvurur, zaman zaman bir atasözüyle sözünü güçlendirirsin — ama her paragrafa doldurmazsın, doğal kalırsın.",
     "Örneklerinde KİŞİ ADI kullanmazsın (\"bir komşum\", \"bir arkadaşım\" dersin).",
     "Yapay zekâ gibi yazmazsın: madde listesi, tablo, başlıklı bölüm, kalın yazı, \"sonuç olarak\", \"unutmayın ki\", \"özetle\" gibi kalıplar yok. Cümle uzunlukların değişir; bazen kısa bir cümleyle vurgu yaparsın.",
+    "Kitap, dergi gibi kültür ürünlerini fiyatı ucuz diye ÖNERMEZSİN; kitap fiyatıyla ölçülmez (Kemal, 18 Kas 2026).",
     "Okura ASLA \"pazarlık edin\" demezsin: marketlerde ve online mağazalarda fiyat sabittir, pazarlık olmaz (Kemal, 17 Kas 2026). Bunun yerine mağazaları karşılaştırmayı, en ucuz yeri seçmeyi önerirsin.",
     "YALNIZ sana verilen ürün, fiyat ve mağaza bilgilerini kullanırsın; fiyat, kampanya, mağaza ya da indirim UYDURMAZSIN.",
     "Fiyatların gün içinde değişebileceğini bir yerde doğal bir dille hatırlatırsın. Marka kötülemez, hakaret etmezsin.",
@@ -47,6 +48,34 @@ def _get(path: str):
         return json.loads(r.read().decode("utf-8"))
 
 
+KATEGORI_ADI = {
+    "gida": "gıda / market ürünü", "temizlik": "temizlik ürünü", "kisisel_bakim": "kişisel bakım / kozmetik ürünü",
+    "anne_bebek": "anne-bebek ürünü", "evcil_hayvan": "evcil hayvan ürünü", "teknoloji_beyaz_esya": "elektronik / beyaz eşya",
+    "ev_yasam_mutfak": "ev ve mutfak eşyası", "saglik_spor_outdoor": "spor / sağlık ürünü", "yapi_oto_bahce": "yapı market / oto / bahçe ürünü",
+    "giyim_aksesuar": "giyim / aksesuar", "kitap_kirtasiye": "kitap / kırtasiye", "oyuncak_hobi": "oyuncak / hobi ürünü",
+}
+
+
+def _cins(link: str) -> str:
+    """Ürünün ne olduğu (kitap mı, deterjan mı) — Kemal, 18 Kas 2026: "Ahmet Ümit ne ya?... Kitap desenize"."""
+    try:
+        anahtar = link.split("/urun/")[1].split("?")[0].replace("-", "_")
+        p = (_get(f"/api/products/{anahtar}") or {}).get("product") or {}
+        return KATEGORI_ADI.get(p.get("category") or "", p.get("category") or "")
+    except Exception:
+        return ""
+
+
+# Kemal, 18 Kas 2026: "kitabın ucuzu yazılmaz... etik değil... kitap fiyatıyla ölçülmemeli". Kitaplar ucuz diye
+# önerilmez. (Okurların çok beğendiği popüler kitap indirime girerse yazı sonunda anılabilir; bunun için güvenilir
+# beğeni verisi gelene kadar kitap hiç alınmaz.)
+_KITAP = re.compile(r"^[^\d]+ - [A-ZÇĞİÖŞÜ][a-zçğıöşü'’]+(?: [A-ZÇĞİÖŞÜ][a-zçğıöşü'’.]+){1,3}$|(kitap|roman|hikaye|şiir|ciltli|karton kapak|yayınları|yayınevi)", re.I)
+
+
+def kitap_mi(ad: str) -> bool:
+    return bool(_KITAP.search(ad or ""))
+
+
 def urunleri_topla():
     secilen, gorulen = [], set()
     for tur, adet in TURLER:
@@ -57,11 +86,12 @@ def urunleri_topla():
         n = 0
         for it in items:
             link = it["link"].split("?")[0]
-            if link in gorulen:
+            if link in gorulen or kitap_mi(it.get("baslik", "")):
                 continue
             gorulen.add(link)
             secilen.append({
                 "tur": it.get("etiket") or tur,
+                "cins": _cins(link),
                 "ad": it["baslik"],
                 "link": link + "?utm_source=basinca&utm_medium=market_dedektifi",
                 "durum": it.get("ozet", ""),
@@ -157,13 +187,14 @@ def _gemini(model: str, sistem: str, soru: str) -> str:
 def yaz(urunler):
     tarih = datetime.now().strftime("%d.%m.%Y")
     bilgi = "\n".join(
-        f"- {u['ad']} [{u['tur']}]: {u['durum']} Mağazalar: {u['magazalar']}. BAĞLANTI: {u['link']}" for u in urunler
+        f"- {u['ad']} (ÜRÜN CİNSİ: {u.get('cins') or 'adından anlaşılır'}) [{u['tur']}]: {u['durum']} Mağazalar: {u['magazalar']}. BAĞLANTI: {u['link']}" for u in urunler
     )
     soru = "\n".join([
         f"Bugün {tarih}. Sabah dipci.tr'de market ve mağaza fiyatlarını taradın, şunları buldun:",
         bilgi,
         "Bunlardan gıdada, temizlikte, teknolojide ve günlük ihtiyaçlarda gerçekten hesaplı olanları anlatan bir köşe yazısı yaz (550–800 kelime). \"Dostlar,\" diye başla.",
         "Bugün birden ucuzlayan (şok indirim) ürünleri, aynı ürünün mağazalar arasındaki fiyat farkını ve kampanyaları dedektif gözüyle tart. Hepsini saymak zorunda değilsin; en anlamlı 5-7 tanesini seç.",
+        "Her ürünün NE OLDUĞUNU okur ilk okuyuşta anlasın: ürün adını tek başına bırakma, cinsini cümlede söyle. Örnek: \"Ahmet Ümit'in Roma'nın Beş Günü romanı\", \"Ariel'in 4 kiloluk toz çamaşır deterjanı\", \"Philips'in airfryer'ı (yağsız fritöz)\". Kitapsa kitap/roman olduğunu ve yazarını, elektronikse ne cihaz olduğunu yaz. Ürün adındaki büyük-küçük harf hatalarını düzelt (Roma'Nın değil Roma'nın).",
         "Bahsettiğin her ürünün adını İLK geçtiği yerde markdown bağlantısı yap: [ürün adı](BAĞLANTI). Bağlantıyı aynen kullan, değiştirme. Başka bağlantı ekleme.",
         "Başlık kısa ve merak uyandırıcı olsun (büyük harf değil). Spot tek cümle.",
         "Metinde paragraflar arasında boş satır bırak. Yalnız JSON: {\"baslik\": \"\", \"spot\": \"\", \"metin\": \"\"}",
