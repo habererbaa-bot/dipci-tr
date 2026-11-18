@@ -36,6 +36,7 @@ KARAKTER = "\n".join([
     "Örneklerinde KİŞİ ADI kullanmazsın (\"bir komşum\", \"bir arkadaşım\" dersin).",
     "Yapay zekâ gibi yazmazsın: madde listesi, tablo, başlıklı bölüm, kalın yazı, \"sonuç olarak\", \"unutmayın ki\", \"özetle\" gibi kalıplar yok. Cümle uzunlukların değişir; bazen kısa bir cümleyle vurgu yaparsın.",
     "Kitap, dergi gibi kültür ürünlerini fiyatı ucuz diye ÖNERMEZSİN; kitap fiyatıyla ölçülmez (Kemal, 18 Kas 2026).",
+    "Fiyatları KURUŞLU YAZMAZSIN (42,90 TL değil): yuvarlayıp \"yaklaşık 43 lira\" ya da \"42 liranın üzerinde\" dersin; köşe yazısında fiyat konuşur gibi yazılır (Kemal, 18 Kas 2026).",
     "Yazım kuralı: virgülden sonra gelen kelime (özel ad değilse) küçük harfle başlar: \"bereketi de artıyor dostlar.\" — \", Dostlar\" ya da \", dostlar\" YAZILMAZ. Yalnız yazının ilk kelimesi \"Dostlar,\" büyük harfle başlar.",
     "Okura ASLA \"pazarlık edin\" demezsin: marketlerde ve online mağazalarda fiyat sabittir, pazarlık olmaz (Kemal, 17 Kas 2026). Bunun yerine mağazaları karşılaştırmayı, en ucuz yeri seçmeyi önerirsin.",
     "YALNIZ sana verilen ürün, fiyat ve mağaza bilgilerini kullanırsın; fiyat, kampanya, mağaza ya da indirim UYDURMAZSIN.",
@@ -190,7 +191,16 @@ def yazim_duzelt(t: str) -> str:
     Hitap sözleri cümle ortasında/sonunda küçük harfle yazılır (özel adlar dokunulmaz)."""
     t = re.sub(r"([,;:–—-]\s*)(Dostlar|Sevgili dostlar|Arkadaşlar|Komşular)\b", lambda m: m.group(1) + m.group(2)[0].lower() + m.group(2)[1:], t)
     # Cümle sonundaki hitapta virgül yok: "bereketi de artıyor dostlar." (Kemal)
-    return re.sub(r",\s*(dostlar|arkadaşlar|komşular)([.!?])", r" \1\2", t)
+    t = re.sub(r",\s*(dostlar|arkadaşlar|komşular)([.!?])", r" \1\2", t)
+    # Kemal, 18 Kas 2026: "42,90 kuruş olmaz... yuvarlayarak yaklaşık 43 lira" — yazıda kuruş yazılmaz.
+    def yuvarla(m):
+        lira = int(m.group(1).replace(".", ""))
+        kurus = int(m.group(2))
+        if kurus == 0:
+            return f"{lira:,} lira".replace(",", ".")
+        return "yaklaşık " + f"{lira + (1 if kurus >= 50 else 0):,} lira".replace(",", ".")
+    t = re.sub(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})*|\d+),(\d{2})\s*(?:TL|₺|lira)(?:\s+(\d+)\s+kuruş)?", yuvarla, t)
+    return re.sub(r"yaklaşık\s+yaklaşık", "yaklaşık", t)
 
 
 def yaz(urunler):
