@@ -136,7 +136,11 @@ def yanlis_teklifleri_sil() -> dict:
         parca = sil[i:i + 500]
         c.execute(f"DELETE FROM price_snapshots WHERE id IN ({','.join('?' * len(parca))})", parca)
     c.commit()
-    db.rebuild_catalog_index()
+    if sil:
+        try:
+            db.rebuild_catalog_index()
+        except Exception:
+            pass  # başka iş yazıyorsa dizini o yeniler
     return {"silinen_teklif": len(sil), "duzelen_urun": len(urun)}
 
 
