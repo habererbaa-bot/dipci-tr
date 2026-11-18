@@ -80,7 +80,23 @@ def koli_adedi(ana: str, teklif: str) -> int:
     if pa and paket(teklif) and not ayni_paket(pa, paket(teklif)):
         return 0
     adet = min(int(x) for x in coklu(teklif) - coklu(ana))
-    return adet if 2 <= adet <= 200 else 0
+    # Koli en çok 24'lüdür; üründe zaten adet yazıyorsa (bebek bezi "74 Adet") başka büyük sayı paket boyudur, koli değil
+    if adet > 24 or (coklu(ana) and adet >= 10):
+        return 0
+    return adet if adet >= 2 else 0
+
+
+def koli_tablosunu_denetle() -> dict:
+    import sqlite3
+    c = sqlite3.connect(str(Path(__file__).resolve().parent / "data" / "dipci_platform.db"))
+    c.row_factory = sqlite3.Row
+    sil = [(r["product_key"], r["platform"], r["adet"]) for r in c.execute(
+        "SELECT k.product_key, k.platform, k.adet, k.title, p.brand, p.family_name FROM koli_teklifleri k "
+        "JOIN canonical_products p USING(product_key)").fetchall()
+        if koli_adedi(f"{r['brand']} {r['family_name']}", r["title"] or "") != r["adet"]]
+    c.executemany("DELETE FROM koli_teklifleri WHERE product_key=? AND platform=? AND adet=?", sil)
+    c.commit()
+    return {"silinen_hatali_koli": len(sil), "kalan": c.execute("SELECT COUNT(*) FROM koli_teklifleri").fetchone()[0]}
 
 
 KOLI_TABLO = """CREATE TABLE IF NOT EXISTS koli_teklifleri (
@@ -156,7 +172,9 @@ def temizle(uygula: bool) -> dict:
 
 if __name__ == "__main__":
     import json
-    if "--yedekten" in sys.argv:
+    if "--koli-denetle" in sys.argv:
+        print(json.dumps(koli_tablosunu_denetle(), ensure_ascii=False))
+    elif "--yedekten" in sys.argv:
         print(json.dumps(yedekten_koliler(sys.argv[sys.argv.index("--yedekten") + 1]), ensure_ascii=False))
     else:
         print(json.dumps(temizle("--temizle" in sys.argv), ensure_ascii=False))
