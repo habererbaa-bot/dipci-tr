@@ -1001,6 +1001,13 @@ class AutoCatalogEngine:
 
         p_info = _extract_pack_info_from_text(f"{pack_label} {raw_title}")
         category = classify_category(f"{brand} {family_name}", hint=category_hint)
+        if category not in ("teknoloji_beyaz_esya", "yapi_oto_bahce", "giyim_aksesuar"):
+            # Koli (12 paket, 4'lü) ve farklı gramaj (500 g / 1 kg) teklifleri tekli ürüne yazılmaz (Kemal, 18 Kas 2026)
+            from teklif_denetim import uyumlu
+            ana = f"{raw_title} {pack_label}"
+            valid_offers = [o for o in valid_offers if uyumlu(ana, str(o.get("title") or raw_title))]
+            if not valid_offers:
+                return None
         if category in UNITLESS_ITEM_CATEGORIES:
             net_amount = 1.0
             base_unit = "adet"
