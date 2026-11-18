@@ -440,6 +440,15 @@ class FastPriceRadar:
             old_ref = round(float(r["median_30d_pack_price"] or rival_next), 2)
             new_p = round(float(r["best_pack_price"]), 2)
             drop_pct = round(float(r["drop_vs_median_pct"]), 1)
+            # Denetim (Kemal, 18 Kas 2026): başka paket, bitmiş kampanya ya da veri hatası şeride girmez
+            try:
+                from denetim import kampanya_hatasi
+                if kampanya_hatasi(self.db.conn, pk, r["best_platform"] or "", new_p, old_ref, drop_pct, r["category"],
+                                   f"{r['brand']} {r['family_name']}"):
+                    self.db.conn.execute("DELETE FROM live_price_drops WHERE product_key = ?", (pk,))
+                    continue
+            except Exception:
+                pass
 
             new_p_fmt = f"{new_p:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
             old_ref_fmt = f"{old_ref:,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")

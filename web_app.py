@@ -534,6 +534,47 @@ def serve_deals_seo_page():
     )
 
 
+@app.get("/denetim", response_class=HTMLResponse)
+def serve_denetim_page():
+    """Denetim raporu (Kemal, 18 Kas 2026): görselsiz ürün, yanlış kampanya, şüpheli karşılaştırma. Arama motoruna kapalı."""
+    import html as _h
+    yol = Path(__file__).resolve().parent / "data" / "denetim_raporu.json"
+    if not yol.exists():
+        return HTMLResponse("<p>Denetim henüz çalışmadı.</p>")
+    r = json.loads(yol.read_text(encoding="utf-8"))
+    e = _h.escape
+
+    def link(key, ad):
+        return f'<a href="/urun/{e(key_to_slug(key))}" target="_blank">{e(ad)}</a>'
+
+    g, k, c = r["gorsel"], r["kampanya"], r["karsilastirma"]
+    kart = lambda baslik, sayi, alt, renk: (
+        f'<div class="kart"><div class="b">{baslik}</div><div class="s" style="color:{renk}">{sayi}</div><div class="a">{alt}</div></div>')
+    satir_k = "".join(f"<tr><td>{link(x['key'], x['urun'])}</td><td>{e(x['magaza'])}</td><td>{x['eski']:.2f} → {x['yeni']:.2f}</td>"
+                      f"<td>{e(x['neden'])}</td></tr>" for x in k["liste"])
+    satir_c = "".join(f"<tr><td>{link(x['key'], x['urun'])}</td><td>{x['en_ucuz']:.2f} ({e(x['en_ucuz_magaza'])})</td>"
+                      f"<td>{x['en_pahali']:.2f} ({e(x['en_pahali_magaza'])})</td><td>{e(x['neden'])}</td></tr>" for x in c["liste"])
+    satir_g = "".join(f"<li>{link(x['key'], x['urun'])}</li>" for x in g["ornek"])
+    sayfa = f"""<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>Denetim · dipci.tr</title>
+<style>body{{font-family:Inter,system-ui,sans-serif;background:#f8fafc;color:#0f172a;margin:0;padding:16px}}main{{max-width:1100px;margin:auto}}
+h1{{font-size:22px}}h2{{font-size:17px;margin-top:28px}}.kartlar{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}}
+.kart{{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:14px}}.b{{font-size:13px;color:#475569}}.s{{font-size:28px;font-weight:700}}
+.a{{font-size:12px;color:#64748b}}table{{width:100%;border-collapse:collapse;background:#fff;font-size:13px}}td,th{{border-bottom:1px solid #e2e8f0;padding:7px;text-align:left;vertical-align:top}}
+.kap{{overflow-x:auto;border:1px solid #e2e8f0;border-radius:12px}}a{{color:#1d4ed8}}</style></head><body><main>
+<h1>dipci denetim raporu</h1><p class="a">Son denetim: {e(r['zaman'])} · saatte bir kendiliğinden çalışır</p>
+<div class="kartlar">
+{kart("Görselsiz ürün", g["gorselsiz"], f"{g['toplam_urun']:,} üründe %{g['oran_yuzde']}".replace(",", "."), "#b45309" if g["gorselsiz"] else "#047857")}
+{kart("Yanlış kampanya", k["yanlis"], f"{k['toplam_kampanya']} kampanyadan; şeritten çıkarıldı", "#b91c1c" if k["yanlis"] else "#047857")}
+{kart("Şüpheli karşılaştırma", c["supheli"], f"{c['karsilastirilan_urun']} karşılaştırmada %{c['oran_yuzde']}", "#b91c1c" if c["supheli"] else "#047857")}
+</div>
+<h2>Yanlış kampanyalar</h2><div class="kap"><table><tr><th>Ürün</th><th>Mağaza</th><th>Eski → yeni</th><th>Neden</th></tr>{satir_k or '<tr><td colspan=4>Yok</td></tr>'}</table></div>
+<h2>Şüpheli karşılaştırmalar</h2><div class="kap"><table><tr><th>Ürün</th><th>En ucuz</th><th>En pahalı</th><th>Neden</th></tr>{satir_c or '<tr><td colspan=4>Yok</td></tr>'}</table></div>
+<h2>Görselsiz ürünler (ilk 30)</h2><ul>{satir_g or '<li>Yok</li>'}</ul>
+</main></body></html>"""
+    return HTMLResponse(sayfa, headers=NO_CACHE_HTML_HEADERS)
+
+
 @app.get("/koli", response_class=HTMLResponse)
 def serve_koli_page():
     return HTMLResponse(

@@ -47,21 +47,29 @@ def gorselsiz(c, uygula: bool) -> dict:
             "ornek": [{"urun": f"{r['brand']} {r['family_name']}", "key": r["product_key"]} for r in rows[:30]]}
 
 
+def kampanya_hatasi(c, product_key: str, platform: str, yeni: float, eski: float, pct: float, kategori: str, ana: str) -> str:
+    """Kampanya yanlışsa nedenini, doğruysa "" döndürür (radar da bunu kullanır)."""
+    if pct > 70 or (yeni > 0 and eski > 4 * yeni):
+        return f"inanılmaz indirim (%{pct:.0f}): veri hatası olabilir"
+    son = c.execute("SELECT title, effective_pack_price FROM price_snapshots WHERE product_key = ? AND platform = ? "
+                    "ORDER BY captured_at DESC LIMIT 1", (product_key, platform)).fetchone()
+    if not son:
+        return ""
+    if kategori not in OZEL_KATEGORI and not uyumlu(ana, son[0] or ""):
+        return f"teklif başka ürün/paket: \"{son[0]}\""
+    if son[1] > yeni * 1.03:
+        return f"kampanya bitmiş: şimdi {son[1]:.2f} TL"
+    return ""
+
+
 def kampanyalar(c, uygula: bool) -> dict:
     rows = c.execute("SELECT d.*, p.brand AS pb, p.family_name AS pf FROM live_price_drops d "
                      "LEFT JOIN canonical_products p USING(product_key)").fetchall()
     yanlis = []
     for d in rows:
         ana = f"{d['pb'] or d['brand']} {d['pf'] or d['family_name']}"
-        son = c.execute("SELECT title, effective_pack_price FROM price_snapshots WHERE product_key = ? AND platform = ? "
-                        "ORDER BY captured_at DESC LIMIT 1", (d["product_key"], d["platform"])).fetchone()
-        neden = ""
-        if d["drop_pct"] > 70 or (d["new_price"] > 0 and d["old_ref_price"] > 4 * d["new_price"]):
-            neden = f"inanılmaz indirim (%{d['drop_pct']:.0f}): veri hatası olabilir"
-        elif son and d["category"] not in OZEL_KATEGORI and not uyumlu(ana, son["title"] or ""):
-            neden = f"teklif başka ürün/paket: \"{son['title']}\""
-        elif son and son["effective_pack_price"] > d["new_price"] * 1.03:
-            neden = f"kampanya bitmiş: şimdi {son['effective_pack_price']:.2f} TL"
+        neden = kampanya_hatasi(c, d["product_key"], d["platform"], d["new_price"], d["old_ref_price"], d["drop_pct"],
+                                d["category"], ana)
         if neden:
             yanlis.append({"urun": ana, "key": d["product_key"], "magaza": d["seller_name"] or d["platform"],
                            "eski": d["old_ref_price"], "yeni": d["new_price"], "indirim": d["drop_pct"], "neden": neden})
@@ -81,7 +89,7 @@ def karsilastirmalar(c) -> dict:
         neden = ""
         if r["best_pack_price"] > 0 and r["worst_pack_price"] > 3 * r["best_pack_price"]:
             neden = f"fiyat farkı {r['worst_pack_price'] / r['best_pack_price']:.1f} kat"
-        if r["category"] not in OZEL_KATEGORI:
+        if r["category"] not in OZEL_KATEGORI and not r["family_name"].startswith("Temel İhtiyaç"):
             for s in c.execute("SELECT platform, title FROM price_snapshots WHERE product_key = ? GROUP BY platform",
                                (r["product_key"],)).fetchall():
                 if not uyumlu(ana, s["title"] or ""):
