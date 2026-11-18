@@ -105,6 +105,7 @@ def karsilastirmalar(c) -> dict:
 
 def calis(uygula: bool) -> dict:
     t0 = time.time()
+    silinen = yanlis_teklifleri_sil() if uygula else {}
     db = PriceMemoryDB(str(KOK / "data" / "dipci_platform.db"))
     c = db.conn
     rapor = {"zaman": datetime.now().strftime("%d.%m.%Y %H:%M"),
@@ -112,6 +113,7 @@ def calis(uygula: bool) -> dict:
              "kampanya": kampanyalar(c, uygula),
              "karsilastirma": karsilastirmalar(c)}
     c.commit()
+    rapor["silinen_yanlis_teklif"] = silinen
     rapor["sure_sn"] = round(time.time() - t0)
     RAPOR.write_text(json.dumps(rapor, ensure_ascii=False, indent=1), encoding="utf-8")
     return rapor
