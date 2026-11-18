@@ -490,6 +490,19 @@
         textOnAccent: "#FFFFFF",
         svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#2563EB">ÇS</div>'
       },
+      colins: { name: "Colin's", short: "Colin's", accent: "#1E3A8A", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#1E3A8A">CL</div>' },
+      columbia: { name: "Columbia", short: "Columbia", accent: "#0F4C81", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#0F4C81">CO</div>' },
+      dr: { name: "D&R", short: "D&R", accent: "#B91C1C", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#B91C1C">D&amp;R</div>' },
+      gap: { name: "Gap", short: "Gap", accent: "#1E293B", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#1E293B">GAP</div>' },
+      hatemoglu: { name: "Hatemoğlu", short: "Hatemoğlu", accent: "#374151", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#374151">HT</div>' },
+      hotic: { name: "Hotiç", short: "Hotiç", accent: "#7C2D12", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#7C2D12">HÇ</div>' },
+      konyalisaat: { name: "Konyalı Saat", short: "Konyalı", accent: "#92400E", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#92400E">KS</div>' },
+      koton: { name: "Koton", short: "Koton", accent: "#0F172A", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#0F172A">KT</div>' },
+      ms: { name: "M&S", short: "M&S", accent: "#14532D", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#14532D">M&amp;S</div>' },
+      puma: { name: "Puma", short: "Puma", accent: "#111827", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#111827">PU</div>' },
+      saatsaat: { name: "Saat&Saat", short: "Saat&Saat", accent: "#1F2937", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#1F2937">S&amp;S</div>' },
+      sporthink: { name: "Sporthink", short: "Sporthink", accent: "#DC2626", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#DC2626">SP</div>' },
+      sportive: { name: "Sportive", short: "Sportive", accent: "#1D4ED8", textOnAccent: "#FFFFFF", svg: '<div class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-white text-[10px]" style="background:#1D4ED8">SV</div>' },
       default: {
         name: "Mağaza",
         short: "Mağaza",
@@ -510,11 +523,12 @@
       evcil_hayvan: { label: "Evcil Hayvan" },
       saglik_spor_outdoor: { label: "Sağlık, Vitamin & Spor" },
       yapi_oto_bahce: { label: "Yapı Market, Oto & Bahçe" },
-      giyim_aksesuar: { label: "Giyim, Saat & Aksesuar" }
+      giyim_aksesuar: { label: "Giyim, Saat & Aksesuar" },
+      kitap_hobi: { label: "Kitap, Müzik & Hobi" }
     };
 
     function isUnitlessCategory(cat) {
-      return cat === "teknoloji_beyaz_esya" || cat === "ev_yasam_mutfak" || cat === "saglik_spor_outdoor" || cat === "yapi_oto_bahce" || cat === "giyim_aksesuar";
+      return cat === "teknoloji_beyaz_esya" || cat === "ev_yasam_mutfak" || cat === "saglik_spor_outdoor" || cat === "yapi_oto_bahce" || cat === "giyim_aksesuar" || cat === "kitap_hobi";
     }
 
     const VERDICT_LABELS = {
@@ -1192,7 +1206,8 @@
         evcil_hayvan: "evcil-hayvan",
         saglik_spor_outdoor: "saglik-spor-outdoor",
         yapi_oto_bahce: "yapi-oto-bahce",
-        giyim_aksesuar: "giyim-aksesuar"
+        giyim_aksesuar: "giyim-aksesuar",
+        kitap_hobi: "kitap-hobi"
       };
       if (window.history && window.history.replaceState) {
         window.history.replaceState(null, "", catKey && slugReverse[catKey] ? "/kategori/" + slugReverse[catKey] : "/");
@@ -1485,7 +1500,8 @@
         "evcil_hayvan",
         "saglik_spor_outdoor",
         "yapi_oto_bahce",
-        "giyim_aksesuar"
+        "giyim_aksesuar",
+        "kitap_hobi"
       ];
 
       const catFilterHtml = catKeys.map(ck => {
@@ -4867,7 +4883,8 @@
             "evcil-hayvan": "evcil_hayvan",
             "saglik-spor-outdoor": "saglik_spor_outdoor",
             "yapi-oto-bahce": "yapi_oto_bahce",
-            "giyim-aksesuar": "giyim_aksesuar"
+            "giyim-aksesuar": "giyim_aksesuar",
+            "kitap-hobi": "kitap_hobi"
           };
           if (slugMap[slug]) {
             appState.selectedCategory = slugMap[slug];

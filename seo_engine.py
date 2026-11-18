@@ -68,6 +68,11 @@ CATEGORY_META: Dict[str, Dict[str, str]] = {
         "title": "Giyim, Ayakkabı, Saat & Aksesuar En Ucuz Fiyat Karşılaştırma",
         "desc": "Spor ayakkabı, mont, akıllı olmayan saat, çanta ve aksesuarlarda mağazalar arası en düşük fiyatları karşılaştırın.",
     },
+    "kitap_hobi": {
+        "slug": "kitap-hobi",
+        "title": "Kitap, Müzik & Hobi Ürünleri Fiyat Karşılaştırma",
+        "desc": "Kitap, müzik, film, kırtasiye ve hobi ürünlerinde mağazalar arası fiyatları görün.",
+    },
 }
 
 

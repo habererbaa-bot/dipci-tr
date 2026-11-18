@@ -676,7 +676,7 @@ ALL_VALID_CATEGORIES: Set[str] = {
 }
 
 DIPCI_KATEGORILERI = {"gida", "temizlik", "kisisel_bakim", "anne_bebek", "teknoloji_beyaz_esya", "ev_yasam_mutfak",
-                      "evcil_hayvan", "saglik_spor_outdoor", "yapi_oto_bahce", "giyim_aksesuar"}
+                      "evcil_hayvan", "saglik_spor_outdoor", "yapi_oto_bahce", "giyim_aksesuar", "kitap_hobi"}
 
 UNITLESS_ITEM_CATEGORIES: Set[str] = {
     "yapi_oto_bahce",
