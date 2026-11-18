@@ -112,6 +112,10 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
     t0 = time.time()
     liste = kategoriler()
     durum = json.loads(DURUM.read_text()) if DURUM.exists() else {"i": 0, "sayfa": 1}
+    # Engellendikten sonra 6 saat hiç istek atılmaz; 3 dakikada bir denemek engeli uzatıyordu (18 Kas 2026)
+    if time.time() - float(durum.get("engel", 0)) < 6 * 3600:
+        return {"ok": False, "bekliyor": "akakce engeli sonrasi 6 saat ara", "sira": durum}
+    durum.pop("engel", None)
     # Engellendiyse 6 saat hiç istek atma (18 Kas 2026: 3 dakikada bir denemek engeli 10 saat uzattı)
     if time.time() - float(durum.get("engel_zamani") or 0) < 6 * 3600:
         return {"ok": False, "bekliyor": "akakce engeli, 6 saat ara", "sira": durum}
@@ -131,6 +135,8 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
             durum["engel_zamani"] = time.time()
             DURUM.write_text(json.dumps(durum))
             engel = True
+            durum["engel"] = time.time()
+            DURUM.write_text(json.dumps(durum))
             break
         yapilan += 1
         bulunan = urunler(s)
