@@ -53,13 +53,13 @@ def fazla_coklu(ana: str, teklif: str) -> bool:
     pa, pt = paket(ana), paket(teklif)
     if not (pa and pt and ayni_paket(pa, pt)):
         return True
-    # İç adet sayılması için sayı gramajdan ÖNCE gelmeli ("20 Adet 29 Gr", "10'lu 100 Gr"); sonra geliyorsa kolidir
+    # İç adet sayılması için sayı gramajdan ÖNCE gelmeli ("20 Adet 29 Gr", "8 Adet 100 gr", "3'lü 465 Gr"); sonra geliyorsa kolidir
     # ("1 Kg 12 Paket", "200 ml 27 Adet"). "paket/koli" her zaman kolidir.
     n = _norm(teklif)
     gram_yer = _PAKET.search(n).start()
     for m in _COKLU.finditer(n):
         sayi = next(g for g in m.groups() if g)
-        if sayi in fazla and (int(sayi) < 10 or m.start() > gram_yer or re.search(r"paket|koli", m.group(0))):
+        if sayi in fazla and (m.start() > gram_yer or re.search(r"paket|koli", m.group(0))):
             return True
     return False
 

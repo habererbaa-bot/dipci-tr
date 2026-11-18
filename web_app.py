@@ -567,6 +567,8 @@ def api_koli(filtre: str = "hepsi", category: str = "", limit: int = 300):
     out = []
     for r in rows:
         tekli = float(r["best_pack_price"])
+        if not 0.4 <= float(r["birim_fiyat"]) / tekli <= 2.0:  # bu kadar uç fark koli değil yanlış eşleşmedir
+            continue
         fark = round(tekli - float(r["birim_fiyat"]), 2)  # + : koli tanesi daha ucuz
         oran = round(fark / tekli * 100, 1) if tekli else 0.0
         durum = "ucuz" if fark > 0.01 else "pahali"
