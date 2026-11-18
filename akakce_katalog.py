@@ -112,6 +112,9 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
     t0 = time.time()
     liste = kategoriler()
     durum = json.loads(DURUM.read_text()) if DURUM.exists() else {"i": 0, "sayfa": 1}
+    # Engellendiyse 6 saat hiç istek atma (18 Kas 2026: 3 dakikada bir denemek engeli 10 saat uzattı)
+    if time.time() - float(durum.get("engel_zamani") or 0) < 6 * 3600:
+        return {"ok": False, "bekliyor": "akakce engeli, 6 saat ara", "sira": durum}
     db = PriceMemoryDB(str(KOK / "data" / "dipci_platform.db"))
     motor = AutoCatalogEngine(db)
     db.conn.execute("CREATE TABLE IF NOT EXISTS akakce_baglanti (product_key TEXT PRIMARY KEY, url TEXT NOT NULL, kategori TEXT)")
@@ -125,6 +128,8 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
             s = getir(adres)
         except urllib.error.HTTPError as e:
             print("akakce engelledi:", e.code, adres, flush=True)
+            durum["engel_zamani"] = time.time()
+            DURUM.write_text(json.dumps(durum))
             engel = True
             break
         yapilan += 1
@@ -154,7 +159,7 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
         if bulunan and durum["sayfa"] < sayfa_sinir:
             durum["sayfa"] += 1
         else:
-            durum = {"i": (durum["i"] + 1) % len(liste), "sayfa": 1}
+            durum = {"i": (durum["i"] + 1) % len(liste), "sayfa": 1, "engel_zamani": 0}
         DURUM.write_text(json.dumps(durum))
         time.sleep(bekle)
     indeks = db.rebuild_catalog_index()
