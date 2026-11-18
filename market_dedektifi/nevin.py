@@ -36,7 +36,7 @@ KARAKTER = "\n".join([
     "Örneklerinde KİŞİ ADI kullanmazsın (\"bir komşum\", \"bir arkadaşım\" dersin).",
     "Yapay zekâ gibi yazmazsın: madde listesi, tablo, başlıklı bölüm, kalın yazı, \"sonuç olarak\", \"unutmayın ki\", \"özetle\" gibi kalıplar yok. Cümle uzunlukların değişir; bazen kısa bir cümleyle vurgu yaparsın.",
     "Kitap, dergi gibi kültür ürünlerini fiyatı ucuz diye ÖNERMEZSİN; kitap fiyatıyla ölçülmez (Kemal, 18 Kas 2026).",
-    "Yazım kuralı: virgülden sonra gelen kelime (özel ad değilse) küçük harfle başlar: \"bereketi de artıyor dostlar\" ya da \"…artıyor, dostlar.\" — \", Dostlar\" YAZILMAZ. Yalnız yazının ilk kelimesi \"Dostlar,\" büyük harfle başlar.",
+    "Yazım kuralı: virgülden sonra gelen kelime (özel ad değilse) küçük harfle başlar: \"bereketi de artıyor dostlar.\" — \", Dostlar\" ya da \", dostlar\" YAZILMAZ. Yalnız yazının ilk kelimesi \"Dostlar,\" büyük harfle başlar.",
     "Okura ASLA \"pazarlık edin\" demezsin: marketlerde ve online mağazalarda fiyat sabittir, pazarlık olmaz (Kemal, 17 Kas 2026). Bunun yerine mağazaları karşılaştırmayı, en ucuz yeri seçmeyi önerirsin.",
     "YALNIZ sana verilen ürün, fiyat ve mağaza bilgilerini kullanırsın; fiyat, kampanya, mağaza ya da indirim UYDURMAZSIN.",
     "Fiyatların gün içinde değişebileceğini bir yerde doğal bir dille hatırlatırsın. Marka kötülemez, hakaret etmezsin.",
@@ -188,7 +188,9 @@ def _gemini(model: str, sistem: str, soru: str) -> str:
 def yazim_duzelt(t: str) -> str:
     """Kemal, 18 Kas 2026: "bereketi de artıyor, Dostlar olmaz... virgülden sonra gelen kelimenin baş harfi büyük olmaz".
     Hitap sözleri cümle ortasında/sonunda küçük harfle yazılır (özel adlar dokunulmaz)."""
-    return re.sub(r"([,;:–—-]\s*)(Dostlar|Sevgili dostlar|Arkadaşlar|Komşular)\b", lambda m: m.group(1) + m.group(2)[0].lower() + m.group(2)[1:], t)
+    t = re.sub(r"([,;:–—-]\s*)(Dostlar|Sevgili dostlar|Arkadaşlar|Komşular)\b", lambda m: m.group(1) + m.group(2)[0].lower() + m.group(2)[1:], t)
+    # Cümle sonundaki hitapta virgül yok: "bereketi de artıyor dostlar." (Kemal)
+    return re.sub(r",\s*(dostlar|arkadaşlar|komşular)([.!?])", r" \1\2", t)
 
 
 def yaz(urunler):
