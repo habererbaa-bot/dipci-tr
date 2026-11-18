@@ -51,13 +51,73 @@ def fazla_coklu(ana: str, teklif: str) -> bool:
     if not fazla:
         return False
     pa, pt = paket(ana), paket(teklif)
-    return not (pa and pt and ayni_paket(pa, pt) and all(int(x) >= 10 for x in fazla))
+    if not (pa and pt and ayni_paket(pa, pt)):
+        return True
+    # İç adet sayılması için sayı gramajdan ÖNCE gelmeli ("20 Adet 29 Gr", "10'lu 100 Gr"); sonra geliyorsa kolidir
+    # ("1 Kg 12 Paket", "200 ml 27 Adet"). "paket/koli" her zaman kolidir.
+    n = _norm(teklif)
+    gram_yer = _PAKET.search(n).start()
+    for m in _COKLU.finditer(n):
+        sayi = next(g for g in m.groups() if g)
+        if sayi in fazla and (int(sayi) < 10 or m.start() > gram_yer or re.search(r"paket|koli", m.group(0))):
+            return True
+    return False
 
 
 def uyumlu(ana: str, teklif: str) -> bool:
     if fazla_coklu(ana, teklif):
         return False
     return ayni_paket(paket(ana), paket(teklif))
+
+
+def koli_adedi(ana: str, teklif: str) -> int:
+    """Teklif bu ürünün kolisi mi (ör. "1 Kg 12 Paket")? Öyleyse içindeki adet, değilse 0.
+    Kemal, 18 Kas 2026: "12 satan 10 satan belki de daha hesaplı birim maliyet açısından" — koli silinmez, ayrı gösterilir."""
+    if not fazla_coklu(ana, teklif):
+        return 0
+    pa = paket(ana)
+    # Koli başlığındaki tek ürün gramajı ana ürünle aynı olmalı ("6x330 ml" 1,98 Lt'nin kolisi değildir)
+    if pa and paket(teklif) and not ayni_paket(pa, paket(teklif)):
+        return 0
+    adet = min(int(x) for x in coklu(teklif) - coklu(ana))
+    return adet if 2 <= adet <= 200 else 0
+
+
+KOLI_TABLO = """CREATE TABLE IF NOT EXISTS koli_teklifleri (
+    product_key TEXT NOT NULL, platform TEXT NOT NULL, seller_name TEXT, title TEXT, price REAL NOT NULL,
+    adet INTEGER NOT NULL, birim_fiyat REAL NOT NULL, url TEXT, captured_at TEXT NOT NULL,
+    PRIMARY KEY (product_key, platform, adet))"""
+
+
+def koli_kaydet(conn, product_key: str, platform: str, seller: str, title: str, price: float, adet: int, url: str,
+                zaman: str = "") -> None:
+    from datetime import datetime
+    conn.execute(KOLI_TABLO)
+    conn.execute("INSERT OR REPLACE INTO koli_teklifleri VALUES (?,?,?,?,?,?,?,?,?)",
+                 (product_key, platform, seller, title, round(price, 2), adet, round(price / adet, 2), url,
+                  zaman or datetime.now().isoformat()))
+
+
+def yedekten_koliler(yedek: str) -> dict:
+    """Daha önce silinen koli tekliflerini yedek veritabanından koli tablosuna geri alır."""
+    import sqlite3
+    kok = Path(__file__).resolve().parent
+    c = sqlite3.connect(str(kok / "data" / "dipci_platform.db"))
+    c.row_factory = sqlite3.Row
+    c.execute(f"ATTACH DATABASE ? AS y", (yedek,))
+    c.execute(KOLI_TABLO)
+    rows = c.execute("""SELECT s.*, p.brand, p.family_name FROM y.price_snapshots s JOIN canonical_products p USING(product_key)
+                        WHERE s.id NOT IN (SELECT id FROM main.price_snapshots) ORDER BY s.captured_at""").fetchall()
+    n = 0
+    for r in rows:
+        adet = koli_adedi(f"{r['brand']} {r['family_name']}", r["title"] or "")
+        if adet:
+            koli_kaydet(c, r["product_key"], r["platform"], r["seller_name"], r["title"], float(r["effective_pack_price"]),
+                        adet, r["url"] or "", r["captured_at"])
+            n += 1
+    c.commit()
+    return {"yedekte_silinen": len(rows), "koliye_alinan": n,
+            "koli_toplam": c.execute("SELECT COUNT(*) FROM koli_teklifleri").fetchone()[0]}
 
 
 def temizle(uygula: bool) -> dict:
@@ -96,4 +156,7 @@ def temizle(uygula: bool) -> dict:
 
 if __name__ == "__main__":
     import json
-    print(json.dumps(temizle("--temizle" in sys.argv), ensure_ascii=False))
+    if "--yedekten" in sys.argv:
+        print(json.dumps(yedekten_koliler(sys.argv[sys.argv.index("--yedekten") + 1]), ensure_ascii=False))
+    else:
+        print(json.dumps(temizle("--temizle" in sys.argv), ensure_ascii=False))

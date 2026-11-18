@@ -1234,11 +1234,25 @@ def get_product_xray(product_key: str, request: Request):
 
     offers_out.sort(key=lambda x: (0 if x["trusted"] else 1, x["pack_price"], x["unit_price"]))
 
+    # Toplu alım (koli) teklifleri: tekli fiyatlarla karışmaz, tanesi kaça geldiği gösterilir (Kemal, 18 Kas 2026)
+    koli_out = []
+    try:
+        for r in db.conn.execute(
+            """SELECT platform, seller_name, title, price, adet, birim_fiyat, url FROM koli_teklifleri
+               WHERE product_key = ? AND captured_at >= date('now', '-14 days') ORDER BY birim_fiyat LIMIT 6""",
+            (product_key,),
+        ).fetchall():
+            koli_out.append({**dict(r), "tracked_url": affiliate_builder.build_tracking_url(r["url"] or "", sub_id="dipci_koli")
+                             if r["url"] else ""})
+    except Exception:
+        koli_out = []
+
     return {
         "product": dict(prod),
         "barcodes": barcodes,
         "audit": asdict(finding) if finding else None,
         "offers": offers_out,
+        "koli": koli_out,
         "history_series": history_series,
         "vs_comparison": VS_COMPARISONS.get(product_key),
         "social_posts": social_service.list_product_posts(product_key),

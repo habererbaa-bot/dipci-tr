@@ -986,6 +986,7 @@ class AutoCatalogEngine:
         commit: bool = True,
         update_index: bool = True,
     ) -> Optional[str]:
+        koliler = []
         valid_offers = [
             o for o in (offers or [])
             if float(o.get("price") or 0) > 1.0
@@ -1003,8 +1004,10 @@ class AutoCatalogEngine:
         category = classify_category(f"{brand} {family_name}", hint=category_hint)
         if category not in ("teknoloji_beyaz_esya", "yapi_oto_bahce", "giyim_aksesuar"):
             # Koli (12 paket, 4'lü) ve farklı gramaj (500 g / 1 kg) teklifleri tekli ürüne yazılmaz (Kemal, 18 Kas 2026)
-            from teklif_denetim import uyumlu
+            from teklif_denetim import uyumlu, koli_adedi
             ana = f"{raw_title} {pack_label}"
+            koliler = [(o, koli_adedi(ana, str(o.get("title") or ""))) for o in valid_offers]
+            koliler = [(o, n) for o, n in koliler if n]  # koli: tekliye yazılmaz, "toplu alım" olarak ayrı tutulur
             valid_offers = [o for o in valid_offers if uyumlu(ana, str(o.get("title") or raw_title))]
             if not valid_offers:
                 return None
@@ -1041,6 +1044,13 @@ class AutoCatalogEngine:
                 image_url=image_url,
                 commit=False,
             )
+
+            if koliler:
+                from teklif_denetim import koli_kaydet
+                for off, adet in koliler:
+                    koli_kaydet(self.db.conn, pkey, str(off.get("platform") or "default").strip().lower(),
+                                str(off.get("seller_name") or "").strip(), str(off.get("title") or "").strip(),
+                                float(off["price"]), adet, _apply_affiliate_url(str(off.get("url") or "").strip()))
 
             for off in valid_offers:
                 price = round(float(off["price"]), 2)

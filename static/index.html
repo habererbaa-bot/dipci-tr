@@ -1947,6 +1947,38 @@
               `;
             }).join("")}
           </div>
+          ${(d.koli || []).length ? `
+            <div class="rounded-2xl bg-white border border-amber-200 overflow-hidden">
+              <div class="px-4 py-3 bg-amber-50 border-b border-amber-200">
+                <div class="font-semibold text-sm text-amber-900">📦 Toplu alım (koli) fiyatları</div>
+                <div class="text-xs text-amber-800 mt-0.5">Birden çok paket birlikte satılıyor; tanesinin kaça geldiğine bakın.</div>
+              </div>
+              <div class="divide-y divide-slate-100">
+                ${d.koli.map(k => {
+                  const tl = v => Number(v).toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " TL";
+                  const ucuz = basePackMin > 0 && k.birim_fiyat < basePackMin;
+                  const fark = basePackMin > 0 ? Math.abs(basePackMin - k.birim_fiyat) : 0;
+                  return `
+                  <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <span class="font-semibold text-sm text-slate-900">${escapeHtml(k.seller_name || k.platform)}</span>
+                        <span class="px-2 py-0.5 rounded bg-amber-100 text-amber-900 text-[11px] font-semibold num">${k.adet} adet: ${tl(k.price)}</span>
+                        ${basePackMin > 0 ? (ucuz
+                          ? `<span class="px-2 py-0.5 rounded bg-emerald-600 text-white text-[11px] font-medium num">Tanesi ${tl(fark)} daha ucuz</span>`
+                          : `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium num">Tanesi ${tl(fark)} daha pahalı</span>`) : ""}
+                      </div>
+                      <div class="text-xs text-slate-600 truncate mt-0.5">${escapeHtml(k.title || "")}</div>
+                    </div>
+                    <div class="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
+                      <div class="text-base font-bold num ${ucuz ? 'text-emerald-700' : 'text-slate-900'}">Tanesi ${tl(k.birim_fiyat)}</div>
+                      ${k.tracked_url ? `<a href="${escapeHtml(k.tracked_url)}" target="_blank" rel="noopener" class="px-3.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-medium transition">Mağazaya Git ↗</a>` : ""}
+                    </div>
+                  </div>`;
+                }).join("")}
+              </div>
+            </div>
+          ` : ""}
           ${audit.private_label_tip ? `
             <div class="p-4 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-700">
               <strong class="text-slate-900">Muadil Notu:</strong> ${cleanEscape(audit.private_label_tip)}
