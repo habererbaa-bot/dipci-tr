@@ -551,7 +551,9 @@ class FastPriceRadar:
                 pass
 
         tg_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-        tg_chat = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+        # Kemal, 18 Kas 2026: "bu bana gerçek indirim yakaladım diye neden bildirim gönderiyor" — radar Kemal'in kişisel
+        # sohbetine (TELEGRAM_CHAT_ID) yazmaz; yalnız ayrıca bir yayın kanalı (RADAR_TELEGRAM_CHAT_ID) tanımlanırsa oraya yazar.
+        tg_chat = os.getenv("RADAR_TELEGRAM_CHAT_ID", "").strip()
         if tg_token and tg_chat:
             try:
                 tg_payload = json.dumps(
