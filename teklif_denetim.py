@@ -64,8 +64,14 @@ def fazla_coklu(ana: str, teklif: str) -> bool:
     return False
 
 
+def farkli_adet(ana: str, teklif: str) -> bool:
+    """Üründe adet var (2 Adet sünger, 74 Adet bez) ama teklif başka adet söylüyor: başka paket boyu."""
+    ca, ct = coklu(ana), coklu(teklif)
+    return bool(ca and ct and (ca - ct))
+
+
 def uyumlu(ana: str, teklif: str) -> bool:
-    if fazla_coklu(ana, teklif):
+    if fazla_coklu(ana, teklif) or farkli_adet(ana, teklif):
         return False
     return ayni_paket(paket(ana), paket(teklif))
 
@@ -73,7 +79,7 @@ def uyumlu(ana: str, teklif: str) -> bool:
 def koli_adedi(ana: str, teklif: str) -> int:
     """Teklif bu ürünün kolisi mi (ör. "1 Kg 12 Paket")? Öyleyse içindeki adet, değilse 0.
     Kemal, 18 Kas 2026: "12 satan 10 satan belki de daha hesaplı birim maliyet açısından" — koli silinmez, ayrı gösterilir."""
-    if not fazla_coklu(ana, teklif):
+    if not fazla_coklu(ana, teklif) or farkli_adet(ana, teklif):
         return 0
     pa = paket(ana)
     # Koli başlığındaki tek ürün gramajı ana ürünle aynı olmalı ("6x330 ml" 1,98 Lt'nin kolisi değildir)
@@ -157,7 +163,7 @@ def temizle(uygula: bool) -> dict:
             ref = say.most_common(1)[0][0] if say else None
         for s in satirlar:
             t = s["title"] or ""
-            if fazla_coklu(ana, t) or not ayni_paket(ref, paket(t)):
+            if fazla_coklu(ana, t) or farkli_adet(ana, t) or not ayni_paket(ref, paket(t)):
                 silinecek.append(s["id"])
                 etkilenen.add(u["product_key"])
     if uygula and silinecek:
