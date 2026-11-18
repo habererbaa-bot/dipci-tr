@@ -995,6 +995,24 @@ def _norm_search_tr(text: str) -> str:
     )
 
 
+_LISTE_ONBELLEK: dict = {}
+_FACET_ONBELLEK: dict = {}
+
+
+def _onbellek_al(depo: dict, anahtar, sure: float):
+    kayit = depo.get(anahtar)
+    if kayit and time.time() - kayit[0] < sure:
+        return kayit[1]
+    return None
+
+
+def _onbellek_koy(depo: dict, anahtar, deger):
+    if len(depo) > 500:
+        depo.clear()
+    depo[anahtar] = (time.time(), deger)
+    return deger
+
+
 @app.get("/api/products")
 def list_products(
     request: Request,
@@ -1011,6 +1029,13 @@ def list_products(
     limit: int = 72,
     live: int = 0,
 ):
+    # Arama yoksa yanıt 2 dk önbellekte (Kemal, 18 Kas 2026: "site çok yavaş" — katalog 350 bin ürüne çıktı)
+    onbellek_anahtar = None
+    if not (q or "").strip() and not live:
+        onbellek_anahtar = (category, brand, store, min_price, max_price, only_drops, min_stores, sort, page, limit)
+        hazir = _onbellek_al(_LISTE_ONBELLEK, onbellek_anahtar, 120)
+        if hazir is not None:
+            return hazir
     safe_limit = max(12, min(int(limit or 72), 240))
     safe_page = max(1, int(page or 1))
     offset = (safe_page - 1) * safe_limit
@@ -1076,7 +1101,8 @@ def list_products(
 
     order_map = {
         # Ana sayfa: çok alınan/aranan temel ihtiyaçlar önde, aynı gruptakiler 3 saatte bir yer değiştirir (Kemal, 17 Kas 2026)
-        "ihtiyac": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, CASE WHEN COALESCE(image_url, '') <> '' THEN 1 ELSE 0 END DESC, dipci_talep(search_norm, category) / 10 DESC, dipci_karisim(product_key)",
+        # Talep/karışım hesabı yalnız çok mağazalı ürünlerde yapılır (tüm katalogda yapmak sayfayı 15 sn'ye çıkarıyordu)
+        "ihtiyac": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, CASE WHEN COALESCE(image_url, '') <> '' THEN 1 ELSE 0 END DESC, CASE WHEN offer_count >= 2 THEN dipci_talep(search_norm, category) / 10 END DESC, CASE WHEN offer_count >= 2 THEN dipci_karisim(product_key) END, savings_pct DESC",
         "savings": "CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC, savings_pct DESC, offer_count DESC",
         "drops": "is_real_drop DESC, drop_vs_median_pct DESC, savings_pct DESC",
         "price_asc": "best_pack_price ASC, offer_count DESC",
@@ -1099,7 +1125,9 @@ def list_products(
 
     # Dinamik marka, kategori ve gerçek indirim sayıları (hızlı tekil indeks üzerinden)
     facet_where, facet_params = _build_where(False)
-    brand_facets = [
+    facet_anahtar = (facet_where, tuple(facet_params))
+    facet_hazir = _onbellek_al(_FACET_ONBELLEK, facet_anahtar, 600)
+    brand_facets = facet_hazir[0] if facet_hazir else [
         {"brand": br["brand"], "count": int(br["c"])}
         for br in db.conn.execute(
             f"""
@@ -1113,68 +1141,16 @@ def list_products(
             facet_params,
         ).fetchall()
     ]
-    cat_counts = {
-        cr["category"]: int(cr["c"])
-        for cr in db.conn.execute(
-            "SELECT category, COUNT(*) AS c FROM product_catalog_index WHERE offer_count >= 1 GROUP BY category"
-        ).fetchall()
-    }
-
-    global_stats = db.conn.execute(
-        """
-        SELECT
-            (SELECT COUNT(*) FROM product_catalog_index WHERE offer_count >= 1) AS prod_cnt,
-            (SELECT COALESCE(SUM(offer_count), 0) FROM product_catalog_index WHERE offer_count >= 1) AS quote_cnt,
-            (SELECT COUNT(*) FROM product_catalog_index WHERE is_real_drop = 1 AND offer_count >= 2) AS drop_cnt,
-            (SELECT COALESCE(MAX(savings_pct), 0) FROM product_catalog_index WHERE offer_count >= 2) AS max_sav
-        """
-    ).fetchone()
+    if facet_hazir:
+        cat_counts, global_stats = facet_hazir[1], facet_hazir[2]
+    else:
+        cat_counts, global_stats = _genel_sayilar()
+        _onbellek_koy(_FACET_ONBELLEK, facet_anahtar, (brand_facets, cat_counts, global_stats))
 
     items = []
     for r in page_rows:
-        raw_top = json.loads(r["top_quotes_json"] or "[]")
-        top_quotes = [
-            {
-                "platform": tq["platform"],
-                "seller_name": tq["seller_name"],
-                "pack_price": tq["pack_price"],
-                "unit_price": tq["unit_price"],
-                "net_amount": tq["net_amount"],
-                "tracked_url": affiliate_builder.build_tracking_url(tq.get("url") or "", sub_id="dipci_vitrin"),
-            }
-            for tq in raw_top
-        ]
-        items.append(
-            {
-                "product_key": r["product_key"],
-                "brand": r["brand"],
-                "family_name": r["family_name"],
-                "category": r["category"],
-                "base_unit": r["base_unit"],
-                "image_url": r["image_url"] or "",
-                "barcodes": json.loads(r["barcodes_json"] or "[]"),
-                "offer_count": int(r["offer_count"] or 0),
-                "social_post_count": 0,
-                "best_platform": r["best_platform"] or "",
-                "best_seller_name": r["best_seller_name"] or "",
-                "best_pack_price": float(r["best_pack_price"] or 0.0),
-                "best_unit_price": float(r["best_unit_price"] or 0.0),
-                "best_net_amount": float(r["best_net_amount"] or 1.0),
-                "best_tracked_url": affiliate_builder.build_tracking_url(r["best_url"], sub_id="dipci_vitrin") if r["best_url"] else "",
-                "worst_platform": r["worst_platform"] or "",
-                "worst_pack_price": float(r["worst_pack_price"] or 0.0),
-                "worst_unit_price": float(r["worst_unit_price"] or 0.0),
-                "savings_pct": float(r["savings_pct"] or 0.0),
-                "median_30d_pack_price": float(r["median_30d_pack_price"] or 0.0),
-                "drop_vs_median_pct": float(r["drop_vs_median_pct"] or 0.0),
-                "is_real_drop": bool(r["is_real_drop"]),
-                "top_quotes": top_quotes,
-                "verdict": r["verdict"] or "NORMAL_PIYASA_FIYATI",
-                "detective_score": int(r["detective_score"] or 75),
-            }
-        )
-
-    return {
+        items.append(_liste_ogesi(r))
+    sonuc = {
         "items": items,
         "pagination": {
             "page": safe_page,
@@ -1195,6 +1171,73 @@ def list_products(
             "max_savings_pct": float(global_stats["max_sav"] or 0.0),
         },
     }
+    if onbellek_anahtar is not None:
+        _onbellek_koy(_LISTE_ONBELLEK, onbellek_anahtar, sonuc)
+    return sonuc
+
+
+def _genel_sayilar():
+    hazir = _onbellek_al(_FACET_ONBELLEK, "genel", 300)
+    if hazir:
+        return hazir
+    cat_counts = {
+        cr["category"]: int(cr["c"])
+        for cr in db.conn.execute(
+            "SELECT category, COUNT(*) AS c FROM product_catalog_index WHERE offer_count >= 1 GROUP BY category"
+        ).fetchall()
+    }
+    g = db.conn.execute(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM product_catalog_index WHERE offer_count >= 1) AS prod_cnt,
+            (SELECT COALESCE(SUM(offer_count), 0) FROM product_catalog_index WHERE offer_count >= 1) AS quote_cnt,
+            (SELECT COUNT(*) FROM product_catalog_index WHERE is_real_drop = 1 AND offer_count >= 2) AS drop_cnt,
+            (SELECT COALESCE(MAX(savings_pct), 0) FROM product_catalog_index WHERE offer_count >= 2) AS max_sav
+        """
+    ).fetchone()
+    return _onbellek_koy(_FACET_ONBELLEK, "genel", (cat_counts, dict(g)))
+
+
+def _liste_ogesi(r) -> dict:
+    raw_top = json.loads(r["top_quotes_json"] or "[]")
+    top_quotes = [
+        {
+            "platform": tq["platform"],
+            "seller_name": tq["seller_name"],
+            "pack_price": tq["pack_price"],
+            "unit_price": tq["unit_price"],
+            "net_amount": tq["net_amount"],
+            "tracked_url": affiliate_builder.build_tracking_url(tq.get("url") or "", sub_id="dipci_vitrin"),
+        }
+        for tq in raw_top
+    ]
+    return {
+            "product_key": r["product_key"],
+            "brand": r["brand"],
+            "family_name": r["family_name"],
+            "category": r["category"],
+            "base_unit": r["base_unit"],
+            "image_url": r["image_url"] or "",
+            "barcodes": json.loads(r["barcodes_json"] or "[]"),
+            "offer_count": int(r["offer_count"] or 0),
+            "social_post_count": 0,
+            "best_platform": r["best_platform"] or "",
+            "best_seller_name": r["best_seller_name"] or "",
+            "best_pack_price": float(r["best_pack_price"] or 0.0),
+            "best_unit_price": float(r["best_unit_price"] or 0.0),
+            "best_net_amount": float(r["best_net_amount"] or 1.0),
+            "best_tracked_url": affiliate_builder.build_tracking_url(r["best_url"], sub_id="dipci_vitrin") if r["best_url"] else "",
+            "worst_platform": r["worst_platform"] or "",
+            "worst_pack_price": float(r["worst_pack_price"] or 0.0),
+            "worst_unit_price": float(r["worst_unit_price"] or 0.0),
+            "savings_pct": float(r["savings_pct"] or 0.0),
+            "median_30d_pack_price": float(r["median_30d_pack_price"] or 0.0),
+            "drop_vs_median_pct": float(r["drop_vs_median_pct"] or 0.0),
+            "is_real_drop": bool(r["is_real_drop"]),
+            "top_quotes": top_quotes,
+            "verdict": r["verdict"] or "NORMAL_PIYASA_FIYATI",
+            "detective_score": int(r["detective_score"] or 75),
+        }
 
 
 def _tazelik_iste(product_key: str) -> None:

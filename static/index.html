@@ -106,10 +106,6 @@
           <button onclick="switchMainView('topluluk')" id="dtab-topluluk" class="px-3.5 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition text-slate-600 hover:text-slate-900 hover:bg-slate-50">
             Topluluk
           </button>
-          <label class="scan-mini" role="button" tabindex="0" aria-label="Ürün ya da barkod tara: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
-            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Tara</span>
-            <input id="navScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
-          </label>
         </nav>
       </div>
 
@@ -1763,17 +1759,10 @@
             </div>
 
             <div class="hidden sm:flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onclick="switchMainView('scanner')"
-                class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-medium transition"
-              >
-                <svg class="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" />
-                  <circle cx="12" cy="13" r="3.2" />
-                </svg>
-                <span>Fotoğrafla Bul</span>
-              </button>
+              <label class="scan-mini" style="margin-left:0;height:42px" role="button" tabindex="0" aria-label="Ürün ya da barkod tara: kamerayı aç" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('navScanInput').click()}">
+            <span class="scan-line"></span><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 0 1 2-2h1.93a2 2 0 0 0 1.66-.9l.82-1.2A2 2 0 0 1 11.07 4h1.86a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H19a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><circle cx="12" cy="13" r="3.2"/></svg><span>Tara</span>
+            <input id="navScanInput" type="file" accept="image/*" capture="environment" onchange="handleHomeScanUpload(this)" style="display:none" />
+          </label>
               <button
                 type="button"
                 onclick="switchMainView('custom_basket')"
