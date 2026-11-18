@@ -172,7 +172,7 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
             if u["img"]:
                 db.conn.execute("UPDATE canonical_products SET image_url = ? WHERE product_key = ? AND "
                                 "(image_url IS NULL OR image_url = '')", (u["img"], pk))
-        if i % 1000 == 0:
+        if i % 50 == 0:  # sık kaydet: uzun yazma kilidi tazelemeyi ve siteyi kilitliyordu
             db.conn.commit()
     db.conn.commit()
     return {"magaza": magaza_adi, "feed_satir": okunan, "tekil_urun": len(urunler), "yazilan": yazilan,
