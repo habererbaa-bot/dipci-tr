@@ -44,8 +44,18 @@ def ayni_paket(a: Optional[Tuple[float, str]], b: Optional[Tuple[float, str]]) -
     return a[1] == b[1] and 0.9 <= b[0] / max(a[0], 1e-6) <= 1.1
 
 
+def fazla_coklu(ana: str, teklif: str) -> bool:
+    """Teklifte ürün adında olmayan bir koli/adet sayısı var mı? "20 adet 29 g" gibi iç adet (10 ve üstü) gramaj
+    tutuyorsa koli sayılmaz (çay poşeti, kahve paketi)."""
+    fazla = coklu(teklif) - coklu(ana)
+    if not fazla:
+        return False
+    pa, pt = paket(ana), paket(teklif)
+    return not (pa and pt and ayni_paket(pa, pt) and all(int(x) >= 10 for x in fazla))
+
+
 def uyumlu(ana: str, teklif: str) -> bool:
-    if coklu(teklif) - coklu(ana):
+    if fazla_coklu(ana, teklif):
         return False
     return ayni_paket(paket(ana), paket(teklif))
 
@@ -67,11 +77,11 @@ def temizle(uygula: bool) -> dict:
             continue
         ref = paket(ana)
         if not ref:  # ürün adında gramaj yok: tekliflerde en sık görülen tekli gramaj esas alınır
-            say = Counter(p for p in (paket(s["title"] or "") for s in satirlar if not coklu(s["title"] or "") - coklu(ana)) if p)
+            say = Counter(p for p in (paket(s["title"] or "") for s in satirlar if not fazla_coklu(ana, s["title"] or "")) if p)
             ref = say.most_common(1)[0][0] if say else None
         for s in satirlar:
             t = s["title"] or ""
-            if (coklu(t) - coklu(ana)) or not ayni_paket(ref, paket(t)):
+            if fazla_coklu(ana, t) or not ayni_paket(ref, paket(t)):
                 silinecek.append(s["id"])
                 etkilenen.add(u["product_key"])
     if uygula and silinecek:
