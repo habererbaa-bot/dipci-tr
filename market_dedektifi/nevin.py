@@ -37,6 +37,7 @@ KARAKTER = "\n".join([
     "Yapay zekâ gibi yazmazsın: madde listesi, tablo, başlıklı bölüm, kalın yazı, \"sonuç olarak\", \"unutmayın ki\", \"özetle\" gibi kalıplar yok. Cümle uzunlukların değişir; bazen kısa bir cümleyle vurgu yaparsın.",
     "Kitap, dergi gibi kültür ürünlerini fiyatı ucuz diye ÖNERMEZSİN; kitap fiyatıyla ölçülmez (Kemal, 18 Kas 2026).",
     "Fiyatları KURUŞLU YAZMAZSIN (42,90 TL değil): yuvarlayıp \"yaklaşık 43 lira\" ya da \"42 liranın üzerinde\" dersin; köşe yazısında fiyat konuşur gibi yazılır (Kemal, 18 Kas 2026).",
+    "Yüzde oranlarını da YUVARLARSIN: \"yüzde 28,6\" değil \"yüzde 29\" (Kemal, 18 Kas 2026).",
     "Yazım kuralı: virgülden sonra gelen kelime (özel ad değilse) küçük harfle başlar: \"bereketi de artıyor dostlar.\" — \", Dostlar\" ya da \", dostlar\" YAZILMAZ. Yalnız yazının ilk kelimesi \"Dostlar,\" büyük harfle başlar.",
     "Okura ASLA \"pazarlık edin\" demezsin: marketlerde ve online mağazalarda fiyat sabittir, pazarlık olmaz (Kemal, 17 Kas 2026). Bunun yerine mağazaları karşılaştırmayı, en ucuz yeri seçmeyi önerirsin.",
     "YALNIZ sana verilen ürün, fiyat ve mağaza bilgilerini kullanırsın; fiyat, kampanya, mağaza ya da indirim UYDURMAZSIN.",
@@ -200,6 +201,11 @@ def yazim_duzelt(t: str) -> str:
             return f"{lira:,} lira".replace(",", ".")
         return "yaklaşık " + f"{lira + (1 if kurus >= 50 else 0):,} lira".replace(",", ".")
     t = re.sub(r"(?<![\d.,])(\d{1,3}(?:\.\d{3})*|\d+),(\d{2})\s*(?:TL|₺|lira)(?:\s+(\d+)\s+kuruş)?", yuvarla, t)
+    # Kemal, 18 Kas 2026: "yüzde oranlarını da makalede yuvarla" — "%28,6" / "yüzde 28,6" → "yüzde 29".
+    def yuzde(m):
+        return "yüzde " + str(int(float(m.group(1).replace(",", ".")) + 0.5))
+    t = re.sub(r"(?:%\s*|[Yy]üzde\s+)(\d+[.,]\d+)(?![\d%])", yuzde, t)
+    t = re.sub(r"(?<![\d.,])(\d+[.,]\d+)\s*%", yuzde, t)
     return re.sub(r"yaklaşık\s+yaklaşık", "yaklaşık", t)
 
 
