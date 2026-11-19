@@ -1660,7 +1660,7 @@ class AutoCatalogEngine:
                 state_path.write_text(str((start + len(batch)) % len(rows)))
             except Exception:
                 pass
-        indexed = self.db.rebuild_catalog_index()
+        indexed = self.db.rebuild_catalog_index([r["product_key"] for r in batch])  # yalnız taranan ürünler
         return {"ok": True, "elapsed_sec": round(time.time() - t0, 1), "scanned": len(batch),
                 "enriched": enriched, "online_offers_added": offers_added, "magaza_sitesi_teklif": magaza_eklenen, "indexed": indexed}
 

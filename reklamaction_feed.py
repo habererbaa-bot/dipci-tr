@@ -154,6 +154,7 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
     db = PriceMemoryDB(str(KOK / "data" / "dipci_platform.db"))
     motor = AutoCatalogEngine(db)
     yazilan = 0
+    degisen = []
     for i, u in enumerate(urunler.values(), 1):
         kategori = sabit_kat or _kategori(u["tip"], f"{u['marka']} {u['ad']}")
         teklif = [{"platform": platform, "seller_name": magaza_adi, "title": u["ad"], "price": u["fiyat_son"],
@@ -167,6 +168,7 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
             pk = None
         if pk:
             yazilan += 1
+            degisen.append(pk)
             db.conn.execute("UPDATE canonical_products SET category = ? WHERE product_key = ? AND "
                             "(category IS NULL OR category = '' OR category = 'gida')", (kategori, pk))
             if u["img"]:
@@ -175,6 +177,7 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
         if i % 50 == 0:  # sık kaydet: uzun yazma kilidi tazelemeyi ve siteyi kilitliyordu
             db.conn.commit()
     db.conn.commit()
+    db.rebuild_catalog_index(degisen)  # yalnız bu mağazanın ürünleri, 400'lük parçalarla
     return {"magaza": magaza_adi, "feed_satir": okunan, "tekil_urun": len(urunler), "yazilan": yazilan,
             "sure_sn": round(time.time() - t0)}
 
@@ -208,6 +211,5 @@ if __name__ == "__main__":
         print(json.dumps(r, ensure_ascii=False), flush=True)
         sonuc.append(r)
     db = PriceMemoryDB(str(KOK / "data" / "dipci_platform.db"))
-    print(json.dumps({"indeks": db.rebuild_catalog_index(),
-                      "katalog_toplam": db.conn.execute("SELECT COUNT(*) FROM canonical_products").fetchone()[0]},
+    print(json.dumps({"katalog_toplam": db.conn.execute("SELECT COUNT(*) FROM canonical_products").fetchone()[0]},
                      ensure_ascii=False))

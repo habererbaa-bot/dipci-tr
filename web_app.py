@@ -90,7 +90,20 @@ ensure_seeded(db, social_service)
 # Başlangıçta hızlı arama ve filtreleme indeksi boşsa anında oluştur
 _idx_count = db.conn.execute("SELECT COUNT(*) AS c FROM product_catalog_index").fetchone()["c"]
 _prod_count = db.conn.execute("SELECT COUNT(*) AS c FROM canonical_products WHERE is_private_label = 0").fetchone()["c"]
-if _idx_count < _prod_count:
+def _baslangic_indeksi():
+    try:
+        auto_catalog.reclassify_existing_catalog()
+        db.rebuild_catalog_index()
+        fast_radar.sync_watchlist()
+        fast_radar.detect_and_publish_drops()
+    except Exception as _e:
+        print("baslangic indeksi:", _e)
+
+
+# 400 bin üründe bu iş dakikalar sürüyor: site açılışını bekletmesin, arka planda yapılsın (19 Kas 2026)
+if _idx_count < _prod_count and _idx_count > 1000:
+    threading.Thread(target=_baslangic_indeksi, daemon=True).start()
+elif _idx_count < _prod_count:
     # Arka plandaki tarama veritabanını o an kilitliyorsa site açılışı çökmesin (17 Kas 2026).
     try:
         auto_catalog.reclassify_existing_catalog()

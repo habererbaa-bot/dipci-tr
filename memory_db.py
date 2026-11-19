@@ -597,6 +597,9 @@ class PriceMemoryDB:
         t_30d = (now_dt - timedelta(days=35)).isoformat()
 
         keys_list = [k for k in (product_keys or []) if k]
+        # Çok anahtar: 400'lük parçalar (SQLite değişken sınırı, kısa yazma kilidi)
+        if len(keys_list) > 400:
+            return sum(self.rebuild_catalog_index(keys_list[i:i + 400]) for i in range(0, len(keys_list), 400))
         if keys_list:
             placeholders = ",".join("?" for _ in keys_list)
             prod_rows = self.conn.execute(
@@ -848,7 +851,10 @@ class PriceMemoryDB:
                 """
             )
 
-        if upsert_params:
+        # Tam yenilemede yazma 2000'lik parçalarla, her parçadan sonra kaydedilir: 400 bin üründe tek seferde yazmak
+        # veritabanını 90 sn kilitliyor, üye girişi ve ürün sayfası "database is locked" veriyordu (19 Kas 2026)
+        self.conn.commit()
+        for i in range(0, len(upsert_params), 2000):
             self.conn.executemany(
                 """
                 INSERT OR REPLACE INTO product_catalog_index
@@ -859,9 +865,9 @@ class PriceMemoryDB:
                  is_real_drop, platforms_csv, top_quotes_json, verdict, detective_score, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                upsert_params,
+                upsert_params[i:i + 2000],
             )
-        self.conn.commit()
+            self.conn.commit()
         return len(upsert_params)
 
 

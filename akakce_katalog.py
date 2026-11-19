@@ -119,6 +119,7 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
     motor = AutoCatalogEngine(db)
     db.conn.execute("CREATE TABLE IF NOT EXISTS akakce_baglanti (product_key TEXT PRIMARY KEY, url TEXT NOT NULL, kategori TEXT)")
     yapilan = eklenen = 0
+    degisen = []
     engel = False
     while yapilan < istek:
         kat = liste[durum["i"] % len(liste)]
@@ -148,6 +149,7 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
                 pk = None
             if pk:
                 eklenen += 1
+                degisen.append(pk)
                 db.conn.execute("UPDATE canonical_products SET category = ? WHERE product_key = ?", (kategori, pk))
                 if u["img"]:
                     db.conn.execute("UPDATE canonical_products SET image_url = ? WHERE product_key = ? AND (image_url IS NULL OR image_url = '')",
@@ -162,7 +164,7 @@ def calis(istek: int, sayfa_sinir: int, bekle: float) -> dict:
             durum = {"i": (durum["i"] + 1) % len(liste), "sayfa": 1, "engel_zamani": 0}
         DURUM.write_text(json.dumps(durum))
         time.sleep(bekle)
-    indeks = db.rebuild_catalog_index()
+    indeks = db.rebuild_catalog_index(degisen) if degisen else 0  # yalnız değişen ürünler (tam yenileme 90 sn kilitliyordu)
     toplam = db.conn.execute("SELECT COUNT(*) FROM canonical_products").fetchone()[0]
     return {"ok": not engel, "sayfa_okunan": yapilan, "urun_yazilan": eklenen, "katalog_toplam": toplam,
             "indeks": indeks, "sira": durum, "kategori_sayisi": len(liste), "sure_sn": round(time.time() - t0)}

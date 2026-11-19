@@ -138,7 +138,7 @@ def yanlis_teklifleri_sil() -> dict:
     c.commit()
     if sil:
         try:
-            db.rebuild_catalog_index()
+            db.rebuild_catalog_index(list(urun))
         except Exception:
             pass  # başka iş yazıyorsa dizini o yeniler
     return {"silinen_teklif": len(sil), "duzelen_urun": len(urun)}
