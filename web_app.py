@@ -1290,13 +1290,14 @@ def _tazelik_iste(product_key: str) -> None:
         if not r:
             db.conn.execute("INSERT OR IGNORE INTO yenile_kuyrugu(product_key, istendi) VALUES (?, datetime('now'))", (product_key,))
             db.conn.commit()
-    except sqlite3.OperationalError:
+    except sqlite3.Error:
         pass  # tablo henüz yok ya da veritabanı meşgul: ziyaretçiyi bekletme
 
 
 @app.get("/api/products/{product_key}")
 def get_product_xray(product_key: str, request: Request):
-    _tazelik_iste(product_key)
+    # Kuyruğa yazma arka planda: yazma kilidi varken ziyaretçi 15 sn beklemesin (19 Kas 2026)
+    threading.Thread(target=_tazelik_iste, args=(product_key,), daemon=True).start()
     prod = db.conn.execute(
         "SELECT * FROM canonical_products WHERE product_key = ?", (product_key,)
     ).fetchone()
