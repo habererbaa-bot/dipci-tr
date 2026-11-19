@@ -1383,8 +1383,8 @@
       const delay = (val || "").trim().length >= 3 ? 420 : 200;
       searchTimer = setTimeout(async () => {
         appState.searchLoading = true;
-        await loadProducts(val, appState.selectedCategory, false);
-        appState.searchLoading = false;
+        // Sunucu geç/hatalı yanıt verse de "Taranıyor..." takılı kalmasın (Kemal, 19 Kas 2026)
+        try { await loadProducts(val, appState.selectedCategory, false); } catch (_) {} finally { appState.searchLoading = false; }
         if (appState.view !== "vitrin") {
           appState.view = "vitrin";
         }
@@ -1398,8 +1398,7 @@
       appState.searchQuery = q;
       appState.searchLoading = true;
       renderCurrentView();
-      await loadProducts(q, appState.selectedCategory, q.length >= 3);
-      appState.searchLoading = false;
+      try { await loadProducts(q, appState.selectedCategory, q.length >= 3); } catch (_) {} finally { appState.searchLoading = false; }
       if (appState.view !== "vitrin") {
         appState.view = "vitrin";
       }

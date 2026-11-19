@@ -62,6 +62,8 @@ class _IpBaglanti:
         c.row_factory = sqlite3.Row
         # Web işçileri ve radar/sync zamanlayıcıları aynı dosyaya yazarken "database is locked" yerine beklesin
         c.execute("PRAGMA busy_timeout = 15000")
+        # WAL dosyası 24 GB'a şişmişti (19 Kas 2026): denetim noktasından sonra 256 MB'a kırpılsın
+        c.execute("PRAGMA journal_size_limit = 268435456")
         for ad, args, kw in self._kayitlar:
             getattr(c, ad)(*args, **kw)
         return c

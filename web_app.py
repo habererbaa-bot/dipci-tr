@@ -1140,7 +1140,8 @@ def list_products(
     if (
         q_raw
         and 3 <= len(q_raw) <= 120
-        and ((total_matching == 0 and not brand_clean and not store_clean) or live == 1)
+        # Canlı mağaza taraması yalnız katalogda hiç sonuç yoksa (her Enter'da taramak aramayı yavaşlatıyordu, 19 Kas 2026)
+        and (total_matching == 0 and not brand_clean and not store_clean)
         and _discovery_allowed(request)
     ):
         gtin_arg = q_raw if q_raw.isdigit() and len(q_raw) >= 8 else ""
