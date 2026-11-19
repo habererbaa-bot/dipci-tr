@@ -43,13 +43,55 @@ class LiveMarketQuote:
     energy_class: str
 
 
+class _IpBaglanti:
+    """Her iş parçacığına (thread) kendi SQLite bağlantısı (19 Kas 2026: site aynı anda gelen isteklerde tek bağlantıyı
+    paylaşınca "bad parameter or other API misuse" hatası verip ürün sayfası açılmıyordu). Dışarıdan sıradan bağlantı gibi
+    kullanılır; create_function gibi kayıtlar her yeni bağlantıya da uygulanır."""
+
+    def __init__(self, yol: str):
+        import threading
+        self._yol = yol
+        self._yerel = threading.local()
+        self._kayitlar = []
+        self._bellek = None
+        if yol == ":memory:":  # bellek içi veritabanı her bağlantıda ayrı olur: tek bağlantı kalsın
+            self._bellek = self._ac()
+
+    def _ac(self):
+        c = sqlite3.connect(self._yol, check_same_thread=False, timeout=15)
+        c.row_factory = sqlite3.Row
+        # Web işçileri ve radar/sync zamanlayıcıları aynı dosyaya yazarken "database is locked" yerine beklesin
+        c.execute("PRAGMA busy_timeout = 15000")
+        for ad, args, kw in self._kayitlar:
+            getattr(c, ad)(*args, **kw)
+        return c
+
+    def _baglanti(self):
+        if self._bellek is not None:
+            return self._bellek
+        c = getattr(self._yerel, "c", None)
+        if c is None:
+            c = self._yerel.c = self._ac()
+        return c
+
+    def create_function(self, *args, **kw):
+        self._kayitlar.append(("create_function", args, kw))
+        return self._baglanti().create_function(*args, **kw)
+
+    def __getattr__(self, ad):
+        return getattr(self._baglanti(), ad)
+
+    def __setattr__(self, ad, deger):
+        if ad.startswith("_"):
+            object.__setattr__(self, ad, deger)
+        else:
+            setattr(self._baglanti(), ad, deger)
+
+
 class PriceMemoryDB:
     def __init__(self, db_path: str | Path = ":memory:"):
         self.db_path = str(db_path)
-        self.conn = sqlite3.connect(self.db_path, check_same_thread=False, timeout=15)
-        self.conn.row_factory = sqlite3.Row
-        # Web işçileri ve radar/sync zamanlayıcıları aynı dosyaya yazarken "database is locked" yerine beklesin
-        self.conn.execute("PRAGMA busy_timeout = 15000")
+        self.conn = _IpBaglanti(self.db_path)
         self._init_schema()
 
     def _init_schema(self) -> None:
