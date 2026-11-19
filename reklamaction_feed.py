@@ -174,7 +174,7 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
             if u["img"]:
                 db.conn.execute("UPDATE canonical_products SET image_url = ? WHERE product_key = ? AND "
                                 "(image_url IS NULL OR image_url = '')", (u["img"], pk))
-        if i % 50 == 0:  # sık kaydet: uzun yazma kilidi tazelemeyi ve siteyi kilitliyordu
+        if True:  # her üründen sonra kaydet: 50 üründe bir kaydetmek 8 sn kilit tutuyordu, üye girişi düşüyordu (19 Kas)
             db.conn.commit()
     db.conn.commit()
     db.rebuild_catalog_index(degisen)  # yalnız bu mağazanın ürünleri, 400'lük parçalarla
