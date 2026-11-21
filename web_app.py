@@ -6,6 +6,7 @@ Tam Kapsamlı Web Sunucusu (FastAPI + SQLite WAL + 7 Katmanlı Market Dedektifi 
 import ipaddress
 import json
 import os
+import re
 import socket
 import threading
 import time
@@ -194,12 +195,17 @@ class SecurityHeadersMiddleware:
             await self.asgi_app(scope, receive, send)
             return
 
-        gomulu = scope.get("path", "").startswith("/reklam/kutu/")
+        path = scope.get("path", "")
+        gomulu = path.startswith("/reklam/kutu/")
+        statik_surumlu = path.startswith("/static/") and b"v=" in (scope.get("query_string") or b"")
 
         async def send_with_headers(message):
             if message["type"] == "http.response.start":
                 headers = [(k, v) for k, v in message.get("headers", []) if k.lower() != b"server"]
                 existing = {k.lower() for k, _ in headers}
+                if statik_surumlu:
+                    headers = [(k, v) for k, v in headers if k.lower() != b"cache-control"]
+                    headers.append((b"cache-control", b"public, max-age=31536000, immutable"))
                 if gomulu:
                     # dipci reklam kutusu basınca'ya gömülür (Kemal, 17 Kas 2026)
                     headers.append((b"content-security-policy", b"frame-ancestors 'self' https://basinca.com https://*.basinca.com"))
@@ -995,39 +1001,55 @@ def serve_indexnow_key():
     return PlainTextResponse(INDEXNOW_KEY)
 
 
+_SITEMAP_ONBELLEK: dict = {}
+
+
+def _sitemap_yanit(anahtar: str, uretici):
+    xml = _onbellek_al(_SITEMAP_ONBELLEK, anahtar, 3600)
+    if xml is None:
+        xml = _onbellek_koy(_SITEMAP_ONBELLEK, anahtar, uretici())
+    return Response(
+        content=xml,
+        media_type="application/xml",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 @app.get("/sitemap.xml")
 def serve_sitemap_index():
-    return Response(content=build_sitemap_index_xml(db), media_type="application/xml")
+    return _sitemap_yanit("index", lambda: build_sitemap_index_xml(db))
 
 
 @app.get("/sitemap-pages.xml")
 def serve_sitemap_pages():
-    return Response(content=build_pages_sitemap_xml(), media_type="application/xml")
+    return _sitemap_yanit("pages", build_pages_sitemap_xml)
 
 
 @app.get("/sitemap-products.xml")
 def serve_sitemap_products():
-    return Response(content=build_products_sitemap_xml(db, page=1), media_type="application/xml")
+    return _sitemap_yanit("products:1", lambda: build_products_sitemap_xml(db, page=1))
 
 
 @app.get("/sitemap-products-{page}.xml")
 def serve_sitemap_products_paged(page: int):
-    return Response(content=build_products_sitemap_xml(db, page=max(1, page)), media_type="application/xml")
+    p = max(1, page)
+    return _sitemap_yanit(f"products:{p}", lambda: build_products_sitemap_xml(db, page=p))
 
 
 @app.get("/sitemap-barcodes.xml")
 def serve_sitemap_barcodes():
-    return Response(content=build_barcodes_sitemap_xml(db, page=1), media_type="application/xml")
+    return _sitemap_yanit("barcodes:1", lambda: build_barcodes_sitemap_xml(db, page=1))
 
 
 @app.get("/sitemap-barcodes-{page}.xml")
 def serve_sitemap_barcodes_paged(page: int):
-    return Response(content=build_barcodes_sitemap_xml(db, page=max(1, page)), media_type="application/xml")
+    p = max(1, page)
+    return _sitemap_yanit(f"barcodes:{p}", lambda: build_barcodes_sitemap_xml(db, page=p))
 
 
 @app.get("/sitemap-categories.xml")
 def serve_sitemap_categories():
-    return Response(content=build_categories_sitemap_xml(), media_type="application/xml")
+    return _sitemap_yanit("categories", build_categories_sitemap_xml)
 
 
 # ----------------- Katalog & 7 Katmanlı Ürün Röntgeni API -----------------
@@ -1083,36 +1105,45 @@ def list_products(
     limit: int = 72,
     live: int = 0,
 ):
-    # Arama yoksa yanıt 2 dk önbellekte (Kemal, 18 Kas 2026: "site çok yavaş" — katalog 350 bin ürüne çıktı)
+    # Önbellek: filtresiz/kategori listeleri 5 dk, arama sonuçları 90 sn önbellekte
+    q_raw = (q or "").strip()
     onbellek_anahtar = None
-    if not (q or "").strip() and not live:
-        onbellek_anahtar = (category, brand, store, min_price, max_price, only_drops, min_stores, sort, page, limit)
-        hazir = _onbellek_al(_LISTE_ONBELLEK, onbellek_anahtar, 120)
+    onbellek_sure = 300 if not q_raw else 90
+    if not live:
+        onbellek_anahtar = (q_raw.lower(), category, brand, store, min_price, max_price, only_drops, min_stores, sort, page, limit)
+        hazir = _onbellek_al(_LISTE_ONBELLEK, onbellek_anahtar, onbellek_sure)
         if hazir is not None:
             return hazir
     safe_limit = max(12, min(int(limit or 72), 240))
     safe_page = max(1, int(page or 1))
     offset = (safe_page - 1) * safe_limit
 
-    q_raw = (q or "").strip()
     q_norm = _norm_search_tr(q_raw)
     q_tokens = [t for t in q_norm.split() if t]
+    fts_terms = [re.sub(r"[^a-z0-9]", "", tok) for tok in q_tokens]
+    fts_terms = [t for t in fts_terms if len(t) >= 2]
+    use_fts = bool(fts_terms) and db.fts_ready()
+    fts_match = " ".join(f"{t}*" for t in fts_terms) if use_fts else ""
     brand_clean = (brand or "").strip()
     store_clean = (store or "").strip().lower()
 
-    def _build_where(include_brand_and_store: bool = True):
-        clauses = ["offer_count >= 1"]
+    def _build_where(include_brand_and_store: bool = True, force_multi_only: bool = False):
+        clauses = ["offer_count >= 2" if force_multi_only else "offer_count >= 1"]
         params: list = []
         if category:
             clauses.append("category = ?")
             params.append(category)
         if q_tokens:
-            for tok in q_tokens:
-                clauses.append("search_norm LIKE ?")
-                params.append(f"%{tok}%")
+            if use_fts:
+                clauses.append("product_key IN (SELECT product_key FROM product_search_fts WHERE product_search_fts MATCH ?)")
+                params.append(fts_match)
+            else:
+                for tok in q_tokens:
+                    clauses.append("search_norm LIKE ?")
+                    params.append(f"%{tok}%")
         if only_drops == 1:
             clauses.append("is_real_drop = 1")
-        if min_stores >= 2:
+        if min_stores >= 2 and not force_multi_only:
             clauses.append("offer_count >= ?")
             params.append(int(min_stores))
         if min_price > 0:
@@ -1130,11 +1161,25 @@ def list_products(
                 params.append(f"%,{store_clean},%")
         return " AND ".join(clauses), params
 
+    is_simple_browse = (
+        not q_tokens
+        and not brand_clean
+        and not store_clean
+        and not only_drops
+        and min_stores < 2
+        and min_price <= 0
+        and max_price <= 0
+    )
+
+    cat_counts_cached, global_stats_cached = _genel_sayilar()
     where_sql, where_params = _build_where(True)
-    total_matching = db.conn.execute(
-        f"SELECT COUNT(*) AS c FROM product_catalog_index WHERE {where_sql}",
-        where_params,
-    ).fetchone()["c"]
+    if is_simple_browse:
+        total_matching = int(cat_counts_cached.get(category, 0) if category else (global_stats_cached.get("prod_cnt") or 0))
+    else:
+        total_matching = db.conn.execute(
+            f"SELECT COUNT(*) AS c FROM product_catalog_index WHERE {where_sql}",
+            where_params,
+        ).fetchone()["c"]
 
     # Katalogda henüz olmayan bir ürün arandıysa canlı mağazalardan keşfet ve kalıcı sayfa aç
     if (
@@ -1167,16 +1212,56 @@ def list_products(
     }
     order_sql = order_map.get(sort, order_map["ihtiyac"])
 
-    page_rows = db.conn.execute(
-        f"""
-        SELECT *
-        FROM product_catalog_index
-        WHERE {where_sql}
-        ORDER BY {order_sql}
-        LIMIT ? OFFSET ?
-        """,
-        where_params + [safe_limit, offset],
-    ).fetchall()
+    # Hızlı yol: ana sayfa ve kategori ilk sayfalarında 700K tekil satırı sıralamak yerine
+    # doğrudan partial indeksli (offer_count >= 2) ~5.800 çok mağazalı üründen çek (<25 ms!)
+    page_rows = []
+    if is_simple_browse and sort in ("ihtiyac", "savings", "offers") and offset < 500:
+        multi_where, multi_params = _build_where(True, force_multi_only=True)
+        multi_order = (
+            "CASE WHEN COALESCE(image_url, '') <> '' THEN 1 ELSE 0 END DESC, dipci_talep(search_norm, category) / 10 DESC, dipci_karisim(product_key), savings_pct DESC"
+            if sort == "ihtiyac"
+            else ("offer_count DESC, savings_pct DESC" if sort == "offers" else "savings_pct DESC, offer_count DESC")
+        )
+        page_rows = db.conn.execute(
+            f"""
+            SELECT *
+            FROM product_catalog_index
+            WHERE {multi_where}
+            ORDER BY {multi_order}
+            LIMIT ? OFFSET ?
+            """,
+            multi_params + [safe_limit, offset],
+        ).fetchall()
+
+    if len(page_rows) < safe_limit and (offset == 0 or not page_rows):
+        if page_rows:
+            # Kategori az çok-mağazalı ürüne sahipse kalanı tekil mağazalardan tamamla
+            seen_pks = {r["product_key"] for r in page_rows}
+            need = safe_limit - len(page_rows)
+            extra = db.conn.execute(
+                f"""
+                SELECT *
+                FROM product_catalog_index
+                WHERE {where_sql} AND offer_count = 1
+                LIMIT ?
+                """,
+                where_params + [need + len(seen_pks)],
+            ).fetchall()
+            for er in extra:
+                if er["product_key"] not in seen_pks and len(page_rows) < safe_limit:
+                    page_rows.append(er)
+                    seen_pks.add(er["product_key"])
+        else:
+            page_rows = db.conn.execute(
+                f"""
+                SELECT *
+                FROM product_catalog_index
+                WHERE {where_sql}
+                ORDER BY {order_sql}
+                LIMIT ? OFFSET ?
+                """,
+                where_params + [safe_limit, offset],
+            ).fetchall()
 
     # Dinamik marka, kategori ve gerçek indirim sayıları (hızlı tekil indeks üzerinden)
     facet_where, facet_params = _build_where(False)
@@ -1199,7 +1284,7 @@ def list_products(
     if facet_hazir:
         cat_counts, global_stats = facet_hazir[1], facet_hazir[2]
     else:
-        cat_counts, global_stats = _genel_sayilar()
+        cat_counts, global_stats = cat_counts_cached, global_stats_cached
         _onbellek_koy(_FACET_ONBELLEK, facet_anahtar, (brand_facets, cat_counts, global_stats))
 
     items = []

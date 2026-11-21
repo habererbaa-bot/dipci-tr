@@ -64,6 +64,10 @@ class _IpBaglanti:
         c.execute("PRAGMA busy_timeout = 15000")
         # WAL dosyası 24 GB'a şişmişti (19 Kas 2026): denetim noktasından sonra 256 MB'a kırpılsın
         c.execute("PRAGMA journal_size_limit = 268435456")
+        # 700K+ ürün ölçeğinde hızlı okuma için 64 MB sayfa önbelleği ve 512 MB mmap
+        c.execute("PRAGMA cache_size = -65536")
+        c.execute("PRAGMA mmap_size = 536870912")
+        c.execute("PRAGMA temp_store = MEMORY")
         for ad, args, kw in self._kayitlar:
             getattr(c, ad)(*args, **kw)
         return c
@@ -198,6 +202,43 @@ class PriceMemoryDB:
                 ON product_catalog_index(brand COLLATE NOCASE);
             CREATE INDEX IF NOT EXISTS idx_catidx_price
                 ON product_catalog_index(best_pack_price);
+            CREATE INDEX IF NOT EXISTS idx_catidx_multi
+                ON product_catalog_index(offer_count DESC, savings_pct DESC)
+                WHERE offer_count >= 2;
+            CREATE INDEX IF NOT EXISTS idx_catidx_cat_multi
+                ON product_catalog_index(category, offer_count DESC, savings_pct DESC)
+                WHERE offer_count >= 2;
+            CREATE INDEX IF NOT EXISTS idx_catidx_offer_cat
+                ON product_catalog_index(offer_count, category);
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS product_search_fts USING fts5(
+                product_key UNINDEXED,
+                search_norm,
+                tokenize='unicode61'
+            );
+
+            CREATE TRIGGER IF NOT EXISTS trg_catidx_fts_ai
+            AFTER INSERT ON product_catalog_index
+            WHEN new.offer_count >= 1
+            BEGIN
+                DELETE FROM product_search_fts WHERE product_key = new.product_key;
+                INSERT INTO product_search_fts(product_key, search_norm)
+                VALUES (new.product_key, new.search_norm);
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS trg_catidx_fts_au
+            AFTER UPDATE OF search_norm, offer_count ON product_catalog_index
+            BEGIN
+                DELETE FROM product_search_fts WHERE product_key = old.product_key;
+                INSERT INTO product_search_fts(product_key, search_norm)
+                SELECT new.product_key, new.search_norm WHERE new.offer_count >= 1;
+            END;
+
+            CREATE TRIGGER IF NOT EXISTS trg_catidx_fts_ad
+            AFTER DELETE ON product_catalog_index
+            BEGIN
+                DELETE FROM product_search_fts WHERE product_key = old.product_key;
+            END;
             """
         )
         cols = {
@@ -207,6 +248,27 @@ class PriceMemoryDB:
         if "image_url" not in cols:
             self.conn.execute("ALTER TABLE canonical_products ADD COLUMN image_url TEXT DEFAULT ''")
         self.conn.commit()
+
+    def fts_ready(self) -> bool:
+        try:
+            row = self.conn.execute("SELECT 1 FROM product_search_fts LIMIT 1").fetchone()
+            return row is not None
+        except Exception:
+            return False
+
+    def rebuild_fts_index(self) -> int:
+        """700K+ ürün için FTS5 tam metin arama indeksini baştan ve temiz şekilde doldurur."""
+        self.conn.execute("DELETE FROM product_search_fts")
+        self.conn.execute(
+            """
+            INSERT INTO product_search_fts(product_key, search_norm)
+            SELECT product_key, search_norm
+            FROM product_catalog_index
+            WHERE offer_count >= 1 AND search_norm <> ''
+            """
+        )
+        self.conn.commit()
+        return int(self.conn.execute("SELECT COUNT(*) FROM product_search_fts").fetchone()[0])
 
     def set_product_image(self, product_key: str, image_url: str, commit: bool = True) -> None:
         if not image_url:

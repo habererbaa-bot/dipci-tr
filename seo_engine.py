@@ -480,8 +480,12 @@ def build_sitemap_index_xml(db: Optional[PriceMemoryDB] = None) -> str:
     bc_pages = 1
     if db is not None:
         prod_cnt = db.conn.execute(
-            "SELECT COUNT(*) AS c FROM canonical_products WHERE is_private_label = 0"
+            "SELECT COUNT(*) AS c FROM product_catalog_index WHERE offer_count >= 1"
         ).fetchone()["c"]
+        if not prod_cnt:
+            prod_cnt = db.conn.execute(
+                "SELECT COUNT(*) AS c FROM canonical_products WHERE is_private_label = 0"
+            ).fetchone()["c"]
         bc_cnt = db.conn.execute("SELECT COUNT(*) AS c FROM product_barcodes").fetchone()["c"]
         prod_pages = max(1, (prod_cnt + SITEMAP_PAGE_SIZE - 1) // SITEMAP_PAGE_SIZE)
         bc_pages = max(1, (bc_cnt + SITEMAP_PAGE_SIZE - 1) // SITEMAP_PAGE_SIZE)
@@ -540,7 +544,16 @@ def build_products_sitemap_xml(db: PriceMemoryDB, page: int = 1) -> str:
     today = datetime.now().strftime("%Y-%m-%d")
     offset = max(0, (page - 1) * SITEMAP_PAGE_SIZE)
     rows = db.conn.execute(
-        "SELECT product_key FROM canonical_products WHERE is_private_label = 0 ORDER BY product_key LIMIT ? OFFSET ?",
+        """
+        SELECT product_key, offer_count
+        FROM product_catalog_index
+        WHERE offer_count >= 1
+        ORDER BY CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC,
+                 offer_count DESC,
+                 savings_pct DESC,
+                 product_key ASC
+        LIMIT ? OFFSET ?
+        """,
         (SITEMAP_PAGE_SIZE, offset),
     ).fetchall()
     return _wrap_urlset(
@@ -548,8 +561,8 @@ def build_products_sitemap_xml(db: PriceMemoryDB, page: int = 1) -> str:
             {
                 "loc": f"{CANONICAL_ORIGIN}/urun/{key_to_slug(r['product_key'])}",
                 "lastmod": today,
-                "changefreq": "hourly",
-                "priority": "0.9",
+                "changefreq": "hourly" if int(r["offer_count"] or 0) >= 2 else "daily",
+                "priority": "0.95" if int(r["offer_count"] or 0) >= 2 else "0.75",
             }
             for r in rows
         ]
