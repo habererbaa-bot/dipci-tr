@@ -986,6 +986,18 @@ def serve_favicon():
     return FileResponse(str(STATIC_DIR / "brand" / "favicon.ico"), media_type="image/x-icon")
 
 
+@app.get("/sw.js")
+def serve_service_worker():
+    return FileResponse(
+        str(STATIC_DIR / "sw.js"),
+        media_type="application/javascript",
+        headers={
+            "Service-Worker-Allowed": "/",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        },
+    )
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def serve_robots():
     return PlainTextResponse(build_robots_txt())

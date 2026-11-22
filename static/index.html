@@ -112,6 +112,19 @@
 
       <!-- Sağ Kurumsal Aksiyonlar -->
       <div class="flex items-center gap-2 shrink-0">
+        <button
+          id="hdrInstallAppBtn"
+          type="button"
+          onclick="triggerAppInstall('header')"
+          title="dipci.tr Uygulamasını Cihazınıza İndirin"
+          class="pwa-install-only inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
+        >
+          <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+          </svg>
+          <span>İndir</span>
+        </button>
+
         <button onclick="openAlertModal()" title="Dip Alarmlarım" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition">
           <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
@@ -127,6 +140,25 @@
       </div>
     </div>
   </header>
+
+  <!-- UYGULAMA İNDİRME TEŞVİK ŞERİDİ (Yüklü olana asla gösterilmez) -->
+  <div id="topInstallStrip" class="pwa-install-only bg-emerald-50 border-b border-emerald-200">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <img src="/static/brand/icon-192.png" alt="dipci.tr" class="w-7 h-7 rounded-lg shrink-0 border border-emerald-200 bg-white" />
+        <div class="text-xs text-emerald-950 leading-snug min-w-0">
+          <strong class="font-semibold" id="topInstallTitle">dipci.tr Uygulamasını Telefona İndir:</strong>
+          <span class="text-emerald-800" id="topInstallDesc">Fiyat dibe indiğinde anlık alarm bildirimi cebine gelsin, tek dokunuşla aç.</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button type="button" onclick="triggerAppInstall('top_banner')" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold whitespace-nowrap transition">
+          Ücretsiz İndir
+        </button>
+        <button type="button" onclick="dismissTopInstallStrip()" title="Şimdilik gizle" class="w-7 h-7 rounded-lg hover:bg-emerald-100 text-emerald-700 text-xs font-semibold">✕</button>
+      </div>
+    </div>
+  </div>
 
   <!-- BİLDİRİM ÇUBUĞU -->
   <div id="toastBanner" class="hidden max-w-6xl w-full mx-auto px-4 sm:px-6 pt-4">
@@ -167,6 +199,7 @@
           <a href="/kategori/evcil-hayvan" onclick="event.preventDefault();filterCategory('evcil_hayvan')" class="hover:text-slate-900">Petshop</a>
           <a href="/firsatlar" onclick="event.preventDefault();switchMainView('deals')" class="text-emerald-700 hover:text-emerald-800">Gerçek İndirim Radarı</a>
           <a href="/koli" onclick="event.preventDefault();switchMainView('koli')" class="text-amber-700 hover:text-amber-800">Koli Fiyatları</a>
+          <button type="button" onclick="triggerAppInstall('footer')" class="pwa-install-only text-emerald-700 hover:text-emerald-900 font-semibold">Uygulamayı İndir</button>
           <button type="button" onclick="switchMainView('partners')" class="hover:text-slate-900">Mağaza XML Başvurusu</button>
           <a href="/kurumsal" class="hover:text-slate-900">Kurumsal İlkeler</a>
           <a href="/api/dedektif/rss.xml" target="_blank" class="text-slate-400 hover:text-slate-700">İndirim RSS</a>
@@ -288,6 +321,15 @@
           Doğrula ve Giriş Yap
         </button>
       </div>
+
+      <div class="pwa-install-only pt-3 border-t border-slate-100 flex items-center justify-between gap-2.5">
+        <div class="text-[11px] text-slate-600 leading-snug">
+          <strong class="text-slate-900">Üyeliğiniz cebinizde olsun:</strong> Alarmlar ve sepetiniz için uygulamayı ücretsiz indirin.
+        </div>
+        <button type="button" onclick="triggerAppInstall('auth_modal')" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0 transition">
+          Uygulamayı İndir
+        </button>
+      </div>
     </div>
   </div>
 
@@ -305,6 +347,21 @@
           </p>
         </div>
         <button onclick="closeAlertModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 text-sm font-medium">✕</button>
+      </div>
+
+      <div id="alertPwaPromoBox" class="pwa-install-only p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <img src="/static/brand/icon-192.png" alt="dipci.tr" class="w-9 h-9 rounded-xl shrink-0 border border-emerald-200 bg-white" />
+          <div class="min-w-0">
+            <div class="text-xs font-semibold text-emerald-950">En Kolay Alarm: dipci.tr Uygulamasını İndir</div>
+            <div class="text-[11px] text-emerald-800 leading-snug mt-0.5">
+              Fiyat dibe indiğinde saniyesinde telefonunuza anlık bildirim gönderelim.
+            </div>
+          </div>
+        </div>
+        <button type="button" onclick="triggerAppInstall('alert_modal')" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shrink-0 transition">
+          Uygulamayı İndir
+        </button>
       </div>
 
       <div id="alertCreateFormBox" class="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
@@ -341,6 +398,33 @@
         <div id="alertListContainer" class="space-y-2 text-xs text-slate-500">
           Henüz dip alarmınız yok.
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UYGULAMA İNDİRME / KURULUM REHBERİ MODALI (iOS & Destekleyen Tüm Tarayıcılar) -->
+  <div id="pwaInstallGuideModal" class="hidden fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl border border-slate-200">
+      <div class="flex items-start justify-between gap-3 pb-3 border-b border-slate-100">
+        <div class="flex items-center gap-3">
+          <img src="/static/brand/icon-192.png" alt="dipci.tr" class="w-11 h-11 rounded-xl border border-slate-200" />
+          <div>
+            <h3 class="text-base font-semibold text-slate-900">dipci.tr Uygulamasını İndir</h3>
+            <p class="text-xs text-slate-500">Mağaza gerekmez • 2 saniyede ana ekranınıza kurulur</p>
+          </div>
+        </div>
+        <button type="button" onclick="closePwaInstallGuide()" class="w-8 h-8 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 text-sm font-medium">✕</button>
+      </div>
+
+      <div id="pwaInstallGuideBody" class="space-y-2.5 text-xs text-slate-700 leading-relaxed"></div>
+
+      <div class="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+        <button type="button" onclick="markDipciAppInstalled()" class="text-[11px] font-medium text-slate-500 hover:text-slate-800 underline">
+          Zaten indirdim, bir daha gösterme
+        </button>
+        <button type="button" onclick="closePwaInstallGuide()" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold">
+          Anladım
+        </button>
       </div>
     </div>
   </div>
@@ -770,6 +854,7 @@
       await refreshAuthStatus();
       closeAuthModal();
       showToast("Hoş geldiniz " + data.member.display_name + ".", "success");
+      onMemberSignedInInstallNudge(data.member.display_name);
       renderCurrentView();
     }
 
@@ -880,6 +965,7 @@
       await refreshAuthStatus();
       closeAuthModal();
       showToast("Hoş geldiniz " + data.member.display_name + ".", "success");
+      onMemberSignedInInstallNudge(data.member.display_name);
       renderCurrentView();
     }
 
@@ -890,6 +976,160 @@
       renderAuthHeader();
       showToast("Oturumunuz kapatıldı.", "info");
       renderCurrentView();
+    }
+
+    // ----------------- PWA Uygulama İndirme & Otomatik Gizleme Motoru -----------------
+
+    let deferredPwaPrompt = null;
+
+    function isDipciAppInstalled() {
+      try {
+        if (window.matchMedia && (
+          window.matchMedia("(display-mode: standalone)").matches ||
+          window.matchMedia("(display-mode: minimal-ui)").matches ||
+          window.matchMedia("(display-mode: fullscreen)").matches
+        )) {
+          localStorage.setItem("dipci_pwa_installed", "1");
+          return true;
+        }
+        if (window.navigator && window.navigator.standalone === true) {
+          localStorage.setItem("dipci_pwa_installed", "1");
+          return true;
+        }
+        if (document.referrer && document.referrer.startsWith("android-app://")) {
+          localStorage.setItem("dipci_pwa_installed", "1");
+          return true;
+        }
+        return localStorage.getItem("dipci_pwa_installed") === "1";
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function syncAppInstallVisibility() {
+      const installed = isDipciAppInstalled();
+      const dismissedUntil = parseInt(localStorage.getItem("dipci_install_strip_dismissed_until") || "0", 10);
+      const stripDismissed = !installed && dismissedUntil > Date.now();
+      document.querySelectorAll(".pwa-install-only").forEach(el => {
+        if (installed) {
+          el.classList.add("hidden");
+        } else if (el.id === "topInstallStrip" && stripDismissed) {
+          el.classList.add("hidden");
+        } else {
+          el.classList.remove("hidden");
+        }
+      });
+    }
+
+    function dismissTopInstallStrip() {
+      // 24 saat gizle; sonraki gün tekrar nazikçe hatırlat (kurulu olana zaten hiç gösterilmez)
+      localStorage.setItem("dipci_install_strip_dismissed_until", String(Date.now() + 24 * 3600 * 1000));
+      const strip = document.getElementById("topInstallStrip");
+      if (strip) strip.classList.add("hidden");
+    }
+
+    function markDipciAppInstalled() {
+      try { localStorage.setItem("dipci_pwa_installed", "1"); } catch (_) {}
+      closePwaInstallGuide();
+      syncAppInstallVisibility();
+      showToast("dipci.tr uygulaması işaretlendi; indirme bağlantıları artık gösterilmeyecek.", "success");
+    }
+
+    function onMemberSignedInInstallNudge(displayName) {
+      if (isDipciAppInstalled()) return;
+      try { localStorage.removeItem("dipci_install_strip_dismissed_until"); } catch (_) {}
+      const titleEl = document.getElementById("topInstallTitle");
+      const descEl = document.getElementById("topInstallDesc");
+      if (titleEl) titleEl.textContent = "Hoş geldiniz " + (displayName || "") + " — Uygulamayı İndirin:";
+      if (descEl) descEl.textContent = "Üyeliğiniz, sepetiniz ve anlık dip alarmlarınız tek dokunuşla telefonunuzda olsun.";
+      syncAppInstallVisibility();
+    }
+
+    function closePwaInstallGuide() {
+      const m = document.getElementById("pwaInstallGuideModal");
+      if (m) m.classList.add("hidden");
+    }
+
+    async function triggerAppInstall(source = "button") {
+      if (isDipciAppInstalled()) {
+        syncAppInstallVisibility();
+        return;
+      }
+      if (deferredPwaPrompt) {
+        try {
+          deferredPwaPrompt.prompt();
+          const choice = await deferredPwaPrompt.userChoice;
+          deferredPwaPrompt = null;
+          if (choice && choice.outcome === "accepted") {
+            localStorage.setItem("dipci_pwa_installed", "1");
+            syncAppInstallVisibility();
+            showToast("dipci.tr uygulaması cihazınıza kuruluyor! Artık dip alarmları anında cebinize gelecek.", "success");
+          }
+          return;
+        } catch (_) {}
+      }
+
+      const ua = (navigator.userAgent || "").toLowerCase();
+      const isIOS = /iphone|ipad|ipod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+      const isAndroid = /android/.test(ua);
+      const bodyEl = document.getElementById("pwaInstallGuideBody");
+      if (bodyEl) {
+        if (isIOS) {
+          bodyEl.innerHTML = `
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 font-medium">
+              iPhone / iPad'de 3 saniyede kurup anlık fiyat düşüş bildirimlerini açabilirsiniz:
+            </div>
+            <ol class="space-y-2 pl-4 list-decimal">
+              <li>Safari'nin alt çubuğundaki <strong>Paylaş (yukarı oklu kare)</strong> simgesine dokunun.</li>
+              <li>Açılan menüde aşağı kaydırıp <strong>"Ana Ekrana Ekle"</strong> seçeneğine dokunun.</li>
+              <li>Sağ üstten <strong>"Ekle"</strong> butonuna basın — dipci.tr ikonu ana ekranınıza gelecektir.</li>
+            </ol>
+          `;
+        } else if (isAndroid) {
+          bodyEl.innerHTML = `
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 font-medium">
+              Android telefonunuza uygulama mağazası beklemeden 2 saniyede kurabilirsiniz:
+            </div>
+            <ol class="space-y-2 pl-4 list-decimal">
+              <li>Tarayıcınızın sağ üst köşesindeki <strong>üç nokta (⋮)</strong> menüsüne dokunun.</li>
+              <li><strong>"Uygulamayı yükle"</strong> veya <strong>"Ana ekrana ekle"</strong> seçeneğine dokunun.</li>
+              <li><strong>"Yükle"</strong> diyerek onaylayın — dipci.tr telefonunuza uygulama olarak kurulur.</li>
+            </ol>
+          `;
+        } else {
+          bodyEl.innerHTML = `
+            <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-950 font-medium">
+              dipci.tr'yi bilgisayarınıza veya telefonunuza tek tıkla uygulama olarak kurabilirsiniz:
+            </div>
+            <ol class="space-y-2 pl-4 list-decimal">
+              <li>Tarayıcınızın adres çubuğunun sağındaki <strong>"dipci.tr'yi Yükle"</strong> (bilgisayar/ok) simgesine tıklayın.</li>
+              <li>Veya sağ üst menüden <strong>"Yayınla, kaydet ve paylaş → Sayfayı uygulama olarak yükle"</strong> seçin.</li>
+              <li>Telefonunuzdan <strong>dipci.tr</strong>'yi açtığınızda da tek dokunuşla ana ekranınıza kurabilirsiniz.</li>
+            </ol>
+          `;
+        }
+      }
+      const modal = document.getElementById("pwaInstallGuideModal");
+      if (modal) modal.classList.remove("hidden");
+    }
+
+    function initDipciPwaEngine() {
+      syncAppInstallVisibility();
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
+      }
+      window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredPwaPrompt = e;
+        syncAppInstallVisibility();
+      });
+      window.addEventListener("appinstalled", () => {
+        deferredPwaPrompt = null;
+        try { localStorage.setItem("dipci_pwa_installed", "1"); } catch (_) {}
+        closePwaInstallGuide();
+        syncAppInstallVisibility();
+        showToast("dipci.tr uygulaması başarıyla kuruldu!", "success");
+      });
     }
 
     // ----------------- Veri Yükleme & Navigasyon -----------------
@@ -2226,6 +2466,13 @@
                 Dip Alarmı
               </button>
               <button
+                type="button"
+                onclick="triggerAppInstall('product_page')"
+                class="pwa-install-only px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition"
+              >
+                Uygulamayı İndir
+              </button>
+              <button
                 onclick="openProductInScanner('${(d.barcodes[0] && d.barcodes[0].gtin) || ''}')"
                 class="px-3.5 py-2 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-medium transition"
               >
@@ -2427,6 +2674,7 @@
       }
 
       document.getElementById("alertModal").classList.remove("hidden");
+      syncAppInstallVisibility();
       await loadUserAlerts();
     }
 
@@ -2454,7 +2702,17 @@
         return;
       }
       localStorage.setItem("dipci_alert_email", data.email || email);
-      showToast(data.message, "success");
+      showToast(
+        isDipciAppInstalled()
+          ? data.message
+          : (data.message + " En hızlı alarm için yukarıdaki 'Uygulamayı İndir' butonundan dipci.tr'yi cihazınıza kurun."),
+        "success"
+      );
+      const promo = document.getElementById("alertPwaPromoBox");
+      if (promo && !isDipciAppInstalled()) {
+        promo.classList.remove("hidden");
+        promo.style.boxShadow = "0 0 0 3px rgba(16,185,129,0.28)";
+      }
       await loadUserAlerts();
     }
 
@@ -4813,6 +5071,7 @@
       else if (appState.view === "topluluk") container.innerHTML = renderCommunityView();
       else if (appState.view === "koli") container.innerHTML = renderKoliView();
       else container.innerHTML = renderPartnersView();
+      syncAppInstallVisibility();
 
       if (activeId) {
         const nextEl = document.getElementById(activeId);
@@ -4931,6 +5190,7 @@
       }
     }
 
+    initDipciPwaEngine();
     bootApp();
   </script>
   <script>
