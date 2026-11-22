@@ -221,23 +221,23 @@ class PriceMemoryDB:
             AFTER INSERT ON product_catalog_index
             WHEN new.offer_count >= 1
             BEGIN
-                DELETE FROM product_search_fts WHERE product_key = new.product_key;
-                INSERT INTO product_search_fts(product_key, search_norm)
-                VALUES (new.product_key, new.search_norm);
+                DELETE FROM product_search_fts WHERE rowid = new.rowid;
+                INSERT INTO product_search_fts(rowid, product_key, search_norm)
+                VALUES (new.rowid, new.product_key, new.search_norm);
             END;
 
             CREATE TRIGGER IF NOT EXISTS trg_catidx_fts_au
             AFTER UPDATE OF search_norm, offer_count ON product_catalog_index
             BEGIN
-                DELETE FROM product_search_fts WHERE product_key = old.product_key;
-                INSERT INTO product_search_fts(product_key, search_norm)
-                SELECT new.product_key, new.search_norm WHERE new.offer_count >= 1;
+                DELETE FROM product_search_fts WHERE rowid = old.rowid;
+                INSERT INTO product_search_fts(rowid, product_key, search_norm)
+                SELECT new.rowid, new.product_key, new.search_norm WHERE new.offer_count >= 1;
             END;
 
             CREATE TRIGGER IF NOT EXISTS trg_catidx_fts_ad
             AFTER DELETE ON product_catalog_index
             BEGIN
-                DELETE FROM product_search_fts WHERE product_key = old.product_key;
+                DELETE FROM product_search_fts WHERE rowid = old.rowid;
             END;
             """
         )
@@ -257,12 +257,12 @@ class PriceMemoryDB:
             return False
 
     def rebuild_fts_index(self) -> int:
-        """700K+ ürün için FTS5 tam metin arama indeksini baştan ve temiz şekilde doldurur."""
+        """700K+ ürün için FTS5 tam metin arama indeksini rowid hizalı olarak doldurur."""
         self.conn.execute("DELETE FROM product_search_fts")
         self.conn.execute(
             """
-            INSERT INTO product_search_fts(product_key, search_norm)
-            SELECT product_key, search_norm
+            INSERT INTO product_search_fts(rowid, product_key, search_norm)
+            SELECT rowid, product_key, search_norm
             FROM product_catalog_index
             WHERE offer_count >= 1 AND search_norm <> ''
             """
