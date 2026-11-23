@@ -1017,9 +1017,7 @@ _SITEMAP_ONBELLEK: dict = {}
 
 
 def _sitemap_yanit(anahtar: str, uretici):
-    xml = _onbellek_al(_SITEMAP_ONBELLEK, anahtar, 3600)
-    if xml is None:
-        xml = _onbellek_koy(_SITEMAP_ONBELLEK, anahtar, uretici())
+    xml = _onbellek_swr(_SITEMAP_ONBELLEK, anahtar, 3600, uretici)
     return Response(
         content=xml,
         media_type="application/xml",
@@ -1085,6 +1083,8 @@ def _norm_search_tr(text: str) -> str:
 
 _LISTE_ONBELLEK: dict = {}
 _FACET_ONBELLEK: dict = {}
+_SWR_CALISAN: set = set()
+_SWR_KILIT = threading.Lock()
 
 
 def _onbellek_al(depo: dict, anahtar, sure: float):
@@ -1094,11 +1094,47 @@ def _onbellek_al(depo: dict, anahtar, sure: float):
     return None
 
 
+def _onbellek_bayat_al(depo: dict, anahtar):
+    kayit = depo.get(anahtar)
+    return kayit[1] if kayit else None
+
+
 def _onbellek_koy(depo: dict, anahtar, deger):
     if len(depo) > 500:
         depo.clear()
     depo[anahtar] = (time.time(), deger)
     return deger
+
+
+def _onbellek_swr(depo: dict, anahtar, sure: float, uretici):
+    """
+    Stale-While-Revalidate:
+    - Taze veri varsa anında döner (<1 ms).
+    - Süresi dolmuş veri varsa yine ANINDA bayat veriyi döner, arka planda tek bir
+      iş parçacığıyla yeniler -> hiçbir ziyaretçi 5-15 sn soğuk önbellek beklemez!
+    """
+    taze = _onbellek_al(depo, anahtar, sure)
+    if taze is not None:
+        return taze
+    bayat = _onbellek_bayat_al(depo, anahtar)
+    if bayat is not None:
+        tag = (id(depo), anahtar)
+        with _SWR_KILIT:
+            if tag not in _SWR_CALISAN:
+                _SWR_CALISAN.add(tag)
+
+                def _yenile():
+                    try:
+                        _onbellek_koy(depo, anahtar, uretici())
+                    except Exception:
+                        pass
+                    finally:
+                        with _SWR_KILIT:
+                            _SWR_CALISAN.discard(tag)
+
+                threading.Thread(target=_yenile, daemon=True).start()
+        return bayat
+    return _onbellek_koy(depo, anahtar, uretici())
 
 
 @app.get("/api/products")
@@ -1117,15 +1153,37 @@ def list_products(
     limit: int = 72,
     live: int = 0,
 ):
-    # Önbellek: filtresiz/kategori listeleri 5 dk, arama sonuçları 90 sn önbellekte
+    # Önbellek (Stale-While-Revalidate): filtresiz/kategori listeleri 5 dk, arama 90 sn;
+    # süresi dolsa bile ziyaretçiye anında bayat önbellek döner, arka planda yenilenir!
     q_raw = (q or "").strip()
-    onbellek_anahtar = None
+    onbellek_anahtar = (q_raw.lower(), category, brand, store, min_price, max_price, only_drops, min_stores, sort, page, limit)
     onbellek_sure = 300 if not q_raw else 90
     if not live:
-        onbellek_anahtar = (q_raw.lower(), category, brand, store, min_price, max_price, only_drops, min_stores, sort, page, limit)
         hazir = _onbellek_al(_LISTE_ONBELLEK, onbellek_anahtar, onbellek_sure)
         if hazir is not None:
             return hazir
+        bayat = _onbellek_bayat_al(_LISTE_ONBELLEK, onbellek_anahtar)
+        if bayat is not None and not q_raw:
+            tag = (id(_LISTE_ONBELLEK), onbellek_anahtar)
+            with _SWR_KILIT:
+                if tag not in _SWR_CALISAN:
+                    _SWR_CALISAN.add(tag)
+
+                    def _yenile_liste():
+                        try:
+                            list_products(
+                                request=request, q=q, category=category, brand=brand, store=store,
+                                min_price=min_price, max_price=max_price, only_drops=only_drops,
+                                min_stores=min_stores, sort=sort, page=page, limit=limit, live=1,
+                            )
+                        except Exception:
+                            pass
+                        finally:
+                            with _SWR_KILIT:
+                                _SWR_CALISAN.discard(tag)
+
+                    threading.Thread(target=_yenile_liste, daemon=True).start()
+            return bayat
     safe_limit = max(12, min(int(limit or 72), 240))
     safe_page = max(1, int(page or 1))
     offset = (safe_page - 1) * safe_limit
@@ -1275,29 +1333,29 @@ def list_products(
                 where_params + [safe_limit, offset],
             ).fetchall()
 
-    # Dinamik marka, kategori ve gerçek indirim sayıları (hızlı tekil indeks üzerinden)
+    # Dinamik marka, kategori ve gerçek indirim sayıları (SWR önbellekli)
     facet_where, facet_params = _build_where(False)
     facet_anahtar = (facet_where, tuple(facet_params))
-    facet_hazir = _onbellek_al(_FACET_ONBELLEK, facet_anahtar, 600)
-    brand_facets = facet_hazir[0] if facet_hazir else [
-        {"brand": br["brand"], "count": int(br["c"])}
-        for br in db.conn.execute(
-            f"""
-            SELECT brand, COUNT(*) AS c
-            FROM product_catalog_index
-            WHERE {facet_where}
-            GROUP BY brand
-            ORDER BY c DESC, brand ASC
-            LIMIT 40
-            """,
-            facet_params,
-        ).fetchall()
-    ]
-    if facet_hazir:
-        cat_counts, global_stats = facet_hazir[1], facet_hazir[2]
-    else:
-        cat_counts, global_stats = cat_counts_cached, global_stats_cached
-        _onbellek_koy(_FACET_ONBELLEK, facet_anahtar, (brand_facets, cat_counts, global_stats))
+
+    def _marka_facet_hesapla():
+        brands_list = [
+            {"brand": br["brand"], "count": int(br["c"])}
+            for br in db.conn.execute(
+                f"""
+                SELECT brand, COUNT(*) AS c
+                FROM product_catalog_index
+                WHERE {facet_where}
+                GROUP BY brand
+                ORDER BY c DESC, brand ASC
+                LIMIT 40
+                """,
+                facet_params,
+            ).fetchall()
+        ]
+        c_cnts, g_st = _genel_sayilar()
+        return (brands_list, c_cnts, g_st)
+
+    brand_facets, cat_counts, global_stats = _onbellek_swr(_FACET_ONBELLEK, facet_anahtar, 600, _marka_facet_hesapla)
 
     items = []
     for r in page_rows:
@@ -1329,25 +1387,25 @@ def list_products(
 
 
 def _genel_sayilar():
-    hazir = _onbellek_al(_FACET_ONBELLEK, "genel", 300)
-    if hazir:
-        return hazir
-    cat_counts = {
-        cr["category"]: int(cr["c"])
-        for cr in db.conn.execute(
-            "SELECT category, COUNT(*) AS c FROM product_catalog_index WHERE offer_count >= 1 GROUP BY category"
-        ).fetchall()
-    }
-    g = db.conn.execute(
-        """
-        SELECT
-            (SELECT COUNT(*) FROM product_catalog_index WHERE offer_count >= 1) AS prod_cnt,
-            (SELECT COALESCE(SUM(offer_count), 0) FROM product_catalog_index WHERE offer_count >= 1) AS quote_cnt,
-            (SELECT COUNT(*) FROM product_catalog_index WHERE is_real_drop = 1 AND offer_count >= 2) AS drop_cnt,
-            (SELECT COALESCE(MAX(savings_pct), 0) FROM product_catalog_index WHERE offer_count >= 2) AS max_sav
-        """
-    ).fetchone()
-    return _onbellek_koy(_FACET_ONBELLEK, "genel", (cat_counts, dict(g)))
+    def _hesapla():
+        cat_counts = {
+            cr["category"]: int(cr["c"])
+            for cr in db.conn.execute(
+                "SELECT category, COUNT(*) AS c FROM product_catalog_index WHERE offer_count >= 1 GROUP BY category"
+            ).fetchall()
+        }
+        g = db.conn.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM product_catalog_index WHERE offer_count >= 1) AS prod_cnt,
+                (SELECT COALESCE(SUM(offer_count), 0) FROM product_catalog_index WHERE offer_count >= 1) AS quote_cnt,
+                (SELECT COUNT(*) FROM product_catalog_index WHERE is_real_drop = 1 AND offer_count >= 2) AS drop_cnt,
+                (SELECT COALESCE(MAX(savings_pct), 0) FROM product_catalog_index WHERE offer_count >= 2) AS max_sav
+            """
+        ).fetchone()
+        return (cat_counts, dict(g))
+
+    return _onbellek_swr(_FACET_ONBELLEK, "genel", 300, _hesapla)
 
 
 def _liste_ogesi(r) -> dict:
@@ -2097,3 +2155,19 @@ def api_register_partner_xml(payload: PartnerXMLPayload, request: Request):
         "ok": True,
         "message": f"{payload.store_name} XML ürün beslemesi doğrulama kuyruğuna alındı.",
     }
+
+
+def _baslangic_onbellek_isit() -> None:
+    """İşçi açıldığında ana sayfa ve sitemap önbelleklerini arka planda ısıtır (ilk ziyaretçi 0 bekleme)."""
+    try:
+        time.sleep(1.5)
+        _genel_sayilar()
+        dummy_req = Request({"type": "http", "method": "GET", "path": "/api/products", "headers": [], "client": ("127.0.0.1", 0)})
+        list_products(dummy_req, sort="ihtiyac", page=1, limit=48)
+        list_products(dummy_req, sort="ihtiyac", page=1, limit=24)
+        _sitemap_yanit("index", lambda: build_sitemap_index_xml(db))
+    except Exception:
+        pass
+
+
+threading.Thread(target=_baslangic_onbellek_isit, daemon=True).start()
