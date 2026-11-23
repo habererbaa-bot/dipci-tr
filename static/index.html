@@ -5227,18 +5227,33 @@
   </script>
   <!-- Kendiliğinden açılan "uygulamayı yükle" uyarısı (Kemal, 23 Kas 2026: "dipçiye her girene uygulamayı yükleme uyarısı açılsın.
        üye olmaya çalışana da, alarm kurmaya çalışana da... diğer özellikleri kullanmak isteyen herkese de"). Yüklü olana açılmaz. -->
-  <div id="appInstallSheet" class="hidden fixed inset-0 z-[70] bg-slate-900/45 flex items-end sm:items-center justify-center p-0 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="appInstallTitle">
-    <div class="w-full sm:max-w-sm bg-white rounded-t-2xl sm:rounded-2xl shadow-xl p-5">
-      <div class="flex items-start gap-3">
-        <img src="/static/brand/icon-192.png" alt="" class="w-14 h-14 rounded-xl shrink-0 border border-slate-200" />
-        <div class="min-w-0">
-          <h2 id="appInstallTitle" class="text-base font-bold text-slate-900">dipci.tr uygulamasını yükleyin</h2>
-          <p id="appInstallSub" class="text-sm text-slate-600 mt-1"></p>
+  <style>
+    #appInstallSheet{position:fixed;inset:0;z-index:70;background:rgba(15,23,42,.5);display:flex;align-items:flex-end;justify-content:center}
+    #appInstallSheet.hidden{display:none}
+    #appInstallSheet .kutu{width:100%;max-width:420px;background:#fff;border-radius:20px 20px 0 0;padding:22px 20px calc(20px + env(safe-area-inset-bottom));box-shadow:0 -10px 40px rgba(15,23,42,.25)}
+    @media (min-width:640px){#appInstallSheet{align-items:center}#appInstallSheet .kutu{border-radius:20px}}
+    #appInstallSheet .ust{display:flex;gap:14px;align-items:flex-start}
+    #appInstallSheet img{width:56px;height:56px;border-radius:14px;border:1px solid #e2e8f0;flex-shrink:0}
+    #appInstallSheet h2{font-size:17px;font-weight:700;color:#0f172a;margin:2px 0 6px}
+    #appInstallSheet p{font-size:14px;line-height:1.45;color:#475569;margin:0}
+    #appInstallSheet .dugmeler{display:flex;gap:10px;margin-top:20px}
+    #appInstallSheet button{flex:1;min-height:48px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer}
+    #appInstallSheet .vazgec{background:#fff;border:1px solid #e2e8f0;color:#475569}
+    #appInstallSheet .yukle{background:#059669;border:0;color:#fff}
+    #appInstallSheet .yukle:hover{background:#047857}
+  </style>
+  <div id="appInstallSheet" class="hidden" role="dialog" aria-modal="true" aria-labelledby="appInstallTitle">
+    <div class="kutu">
+      <div class="ust">
+        <img src="/static/brand/icon-192.png" alt="" />
+        <div>
+          <h2 id="appInstallTitle">dipci.tr uygulamasını yükleyin</h2>
+          <p id="appInstallSub"></p>
         </div>
       </div>
-      <div class="mt-5 flex gap-2">
-        <button type="button" onclick="dipciAppKapat()" class="flex-1 min-h-[44px] rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">Şimdi değil</button>
-        <button type="button" onclick="dipciAppKapat(); triggerAppInstall('otomatik_uyari')" class="flex-1 min-h-[44px] rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold">Ücretsiz Yükle</button>
+      <div class="dugmeler">
+        <button type="button" class="vazgec" onclick="dipciAppKapat()">Şimdi değil</button>
+        <button type="button" class="yukle" onclick="dipciAppKapat(); triggerAppInstall('otomatik_uyari')">Ücretsiz Yükle</button>
       </div>
     </div>
   </div>
