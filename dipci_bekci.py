@@ -229,6 +229,34 @@ def daily_hygiene_if_due() -> bool:
         return False
 
 
+def emergency_wal_truncate_and_restart() -> bool:
+    """
+    Kritik WAL şişmesinde (>900 MB) okuyucu kilitlerini geçici olarak bırakıp
+    WAL dosyasını kesin olarak 0 MB'a indirir, ardından dipci.service'i başlatıp ısıtır.
+    """
+    _log("ONARIM: Kritik WAL temizliği için dipci.service geçici durduruluyor...")
+    stop_active_batch_writers()
+    try:
+        subprocess.run(["systemctl", "stop", "dipci.service"], check=False, timeout=30)
+    except Exception:
+        pass
+    time.sleep(2)
+    ok_cp, after_mb = run_wal_checkpoint("TRUNCATE")
+    _log(f"ONARIM: Kesin WAL temizliği tamamlandı -> {after_mb} MB (ok={ok_cp})")
+    try:
+        subprocess.run(["systemctl", "start", "dipci.service"], check=True, timeout=30)
+        for _ in range(15):
+            time.sleep(2)
+            st, _ = probe_http("/", timeout=4.0)
+            if st == 200:
+                _log("ONARIM: dipci.service temiz WAL ile sağlıklı ayağa kalktı.")
+                warm_web_caches()
+                return True
+    except Exception as exc:
+        _log(f"HATA: dipci.service başlatılamadı: {exc}")
+    return False
+
+
 def main() -> None:
     actions: List[str] = []
 
@@ -241,15 +269,10 @@ def main() -> None:
     wal_mb = wal_size_mb()
     if wal_mb >= WAL_TRUNCATE_MB:
         actions.append(f"wal_critical:{wal_mb}MB")
-        stopped = stop_active_batch_writers()
-        if stopped:
-            time.sleep(2)
-        ok_cp, new_wal = run_wal_checkpoint("TRUNCATE")
+        ok_cp, new_wal = run_wal_checkpoint("PASSIVE")
         if new_wal >= WAL_TRUNCATE_MB:
-            # Açık okuma tutan eski işçileri yenile ve tekrar TRUNCATE yap
-            restart_dipci_service()
-            run_wal_checkpoint("TRUNCATE")
-            actions.append("restarted_for_wal_truncate")
+            emergency_wal_truncate_and_restart()
+            actions.append(f"emergency_wal_truncate_to_{wal_size_mb()}MB")
     elif wal_mb >= WAL_PASSIVE_MB:
         run_wal_checkpoint("PASSIVE")
         actions.append(f"wal_passive:{wal_mb}MB")
