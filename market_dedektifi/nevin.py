@@ -60,6 +60,45 @@ ACILISLAR = [
 ]
 
 
+# Resmi/milli bayramlar ve meslek günleri (Kemal, 24 Kas 2026: "öğretmenler günü gibi, gazeteciler günü gibi,
+# sağlık çalışanları günü gibi, 1 mayıs gibi... hatırla kutla, bazen başlarken bazen yazıyı bitirirken")
+OZEL_GUNLER = {
+    "01-01": "Yılbaşı", "01-10": "Çalışan Gazeteciler Günü", "02-14": "Sevgililer Günü",
+    "03-08": "Dünya Kadınlar Günü", "03-12": "İstiklal Marşı'nın kabulü ve Mehmet Akif Ersoy'u anma günü",
+    "03-14": "Tıp Bayramı (sağlık çalışanlarının günü)", "03-18": "Çanakkale Zaferi ve Şehitleri Anma Günü",
+    "03-21": "Nevruz ve baharın gelişi", "04-05": "Avukatlar Günü", "04-07": "Dünya Sağlık Günü",
+    "04-23": "Ulusal Egemenlik ve Çocuk Bayramı", "05-01": "Emek ve Dayanışma Günü (1 Mayıs)",
+    "05-12": "Hemşireler Günü", "05-19": "Atatürk'ü Anma, Gençlik ve Spor Bayramı", "06-05": "Dünya Çevre Günü",
+    "07-01": "Denizcilik ve Kabotaj Bayramı", "07-15": "Demokrasi ve Milli Birlik Günü",
+    "07-24": "Basın Bayramı (gazetecilerin günü)", "08-30": "Zafer Bayramı", "09-19": "Gaziler Günü",
+    "10-01": "Dünya Yaşlılar Günü", "10-16": "Dünya Gıda Günü", "10-29": "Cumhuriyet Bayramı",
+    "11-10": "Atatürk'ü Anma Günü (saygıyla anılır, kutlanmaz)", "11-24": "Öğretmenler Günü",
+    "12-03": "Dünya Engelliler Günü", "12-05": "Dünya Kadın Hakları Günü", "12-31": "Yılbaşı gecesi",
+    # Tarihi her yıl değişenler
+    "2027-03-08": "Ramazan Bayramı arifesi", "2027-03-09": "Ramazan Bayramı", "2027-03-10": "Ramazan Bayramı",
+    "2027-03-11": "Ramazan Bayramı", "2027-05-09": "Anneler Günü", "2027-05-15": "Kurban Bayramı arifesi",
+    "2027-05-16": "Kurban Bayramı", "2027-05-17": "Kurban Bayramı", "2027-05-18": "Kurban Bayramı",
+    "2027-05-19": "Kurban Bayramı", "2027-06-20": "Babalar Günü",
+}
+
+
+def ozel_gun() -> str:
+    """Bugün (ya da yarın) özel bir günse Nevin onu hatırlar, kutlar."""
+    from datetime import timedelta
+    bugun = datetime.now()
+    yarin = bugun + timedelta(days=1)
+    b = [OZEL_GUNLER.get(bugun.strftime(k)) for k in ("%Y-%m-%d", "%m-%d")]
+    y = [OZEL_GUNLER.get(yarin.strftime(k)) for k in ("%Y-%m-%d", "%m-%d")]
+    b, y = [x for x in b if x], [x for x in y if x]
+    if b:
+        yer = "yazının başında" if bugun.toordinal() % 2 == 0 else "yazının sonunda, vedalaşırken"
+        return (f"BUGÜN {' ve '.join(b)}. Bunu {yer} içtenlikle hatırla ve kutla (anma günüyse saygıyla an, kutlama); "
+                "o meslekten ya da o günle ilgili insanlara bir iki sıcak cümle ayır, gerekirse yazıyı da buna bağla.")
+    if y:
+        return f"YARIN {' ve '.join(y)}. Yazının sonunda bunu sıcak bir dille hatırlat."
+    return ""
+
+
 def gundem() -> str:
     """Basınca'nın son haberleri: Nevin bazen dünün önemli gündemine gönderme yapar."""
     try:
@@ -268,6 +307,7 @@ def yaz(urunler):
         bilgi,
         "Bunlardan gıdada, temizlikte, teknolojide ve günlük ihtiyaçlarda gerçekten hesaplı olanları anlatan bir köşe yazısı yaz (550–800 kelime). \"Dostlar,\" diye başla.",
         "BUGÜNKÜ AÇILIŞIN: " + ACILISLAR[datetime.now().toordinal() % len(ACILISLAR)],
+        ozel_gun() or "Bugün özel bir gün değil; bayram ya da kutlama uydurma.",
         "Dünden bu sabaha Türkiye ve dünya gündemi (yalnız açılışa ya da yazıya gerçekten uyarsa birine değin; uymuyorsa hiç değinme, uydurma):\n" + (gundem() or "(gündem alınamadı)"),
         "Son yazıların aşağıda; başlığın da ilk cümlen de bunlara BENZEMESİN. Başlıkta \"etiket\", \"raf\", \"fiyat\", \"sepet\", \"indirim\" kelimelerini kullanma; başlık hayattan, duygudan, açılıştaki hikâyeden gelsin:\n" + (onceki_yazilar() or "(yok)"),
         "Bugün birden ucuzlayan (şok indirim) ürünleri, aynı ürünün mağazalar arasındaki fiyat farkını ve kampanyaları dedektif gözüyle tart. Hepsini saymak zorunda değilsin; en anlamlı 5-7 tanesini seç.",
