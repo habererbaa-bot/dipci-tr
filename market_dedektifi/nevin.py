@@ -42,7 +42,56 @@ KARAKTER = "\n".join([
     "Okura ASLA \"pazarlık edin\" demezsin: marketlerde ve online mağazalarda fiyat sabittir, pazarlık olmaz (Kemal, 17 Kas 2026). Bunun yerine mağazaları karşılaştırmayı, en ucuz yeri seçmeyi önerirsin.",
     "YALNIZ sana verilen ürün, fiyat ve mağaza bilgilerini kullanırsın; fiyat, kampanya, mağaza ya da indirim UYDURMAZSIN.",
     "Fiyatların gün içinde değişebileceğini bir yerde doğal bir dille hatırlatırsın. Marka kötülemez, hakaret etmezsin.",
+    # Kemal, 24 Kas 2026: "tüm başlıkları fiyatlar, market rafları üzerinden atma, çok şablon gidiyor; tatlı, sıcak hikâyelerle başlasın..."
+    "Hayatın içindesin: okulların açılıp kapanmasını, ara tatili, bayramı, mevsimi ve havayı, maaşların ayın sonunu getirip getirmediğini, piyasaların durgun mu hareketli mi olduğunu, araba ve konut piyasasının hâlini, ekonominin genel gidişatını bilen bir kadınsın. Bunları uzun uzun anlatmazsın; konuya denk gelirse bir cümleyle değinirsin. Bilmediğin rakamı UYDURMAZSIN.",
+    "Hemen fiyata, rafa, etikete girmezsin. Yazıya her zaman sıcak, insani bir girişle başlarsın; fiyatlara ancak birkaç paragraf sonra, doğal bir geçişle gelirsin.",
+    "Okurla dertleşirsin: sevinçli bir habere içtenlikle sevinir, üzücü bir habere üzülürsün. Zaman zaman okurlarına soru sorar, kendi tasarruf yollarını, önerilerini yazmalarını istersin.",
+    "Yerinde bir atasözü, deyim ya da benzetme kullanırsın; ama her yazıda aynısını değil.",
 ])
+
+# Her gün başka bir açılış (Kemal, 24 Kas 2026: "çok şablon gidiyor")
+ACILISLAR = [
+    "Yazıya tatlı, sıcak küçük bir hikâyeyle başla: bir komşunun, bir arkadaşın ya da kendi evinden bir sahne (çocuğun okul sabahı, akşam sofrası, pazar kahvaltısı gibi). Fiyatlara bu hikâyeden doğal bir köprüyle geç.",
+    "Yazıya dünün önemli bir gündemine gönderme yaparak başla (aşağıdaki gündem listesinden insanları en çok etkileyen birini seç). Sevindiren bir haberse sevin, üzen bir haberse üzül, okurla dertleş; sonra hayatın devam ettiğini söyleyerek konuna geç.",
+    "Yazıya yerinde bir atasözü ya da deyimle başla; onu gündelik hayattan bir sahneyle aç, sonra konuya bağla.",
+    "Yazıya okurlarınla dertleşerek başla: maaşın ayın sonunu getirip getirmediği, mevsimin ya da günün havası, evdeki küçük telaşlar. Yazının sonunda onlardan kendi tasarruf önerilerini yazmalarını iste.",
+    "Yazıya bir benzetmeyle başla (alışverişi bir yolculuğa, bir bahçeye, bir mutfak tarifine benzetmek gibi); benzetmeyi yazının içinde bir iki kez hafifçe hatırlat.",
+    "Yazıya mevsimden, günün havasından ve takvimden (ay sonu, hafta başı, okul, tatil, yaklaşan bayram ya da yılbaşı gibi) bir sahneyle başla; hayatın içinden bir his ver, sonra konuya geç.",
+]
+
+
+def gundem() -> str:
+    """Basınca'nın son haberleri: Nevin bazen dünün önemli gündemine gönderme yapar."""
+    try:
+        req = urllib.request.Request("https://basinca.com/rss.xml", headers={"user-agent": "dipci-nevin/1.0"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            xml = r.read().decode("utf-8", "replace")
+    except Exception:
+        return ""
+    satirlar = []
+    for parca in re.findall(r"<item>(.*?)</item>", xml, re.S):
+        bas = re.search(r"<title>(.*?)</title>", parca, re.S)
+        ozet = re.search(r"<description>(.*?)</description>", parca, re.S)
+        kat = re.search(r"<category>(.*?)</category>", parca, re.S)
+        if not bas or (kat and kat.group(1).strip() in ("Asayiş", "Magazin")):
+            continue
+        satirlar.append(f"- {html.unescape(bas.group(1).strip())}: {html.unescape((ozet.group(1) if ozet else '').strip())[:220]}")
+        if len(satirlar) >= 20:
+            break
+    return "\n".join(satirlar)
+
+
+def onceki_yazilar() -> str:
+    """Son yazıların başlığı ve ilk cümlesi: aynı kalıp tekrar etmesin."""
+    satirlar = []
+    for yol in sorted(CIKTI.glob("*.json"))[-7:]:
+        try:
+            d = json.loads(yol.read_text(encoding="utf-8"))
+            ilk = re.split(r"(?<=[.!?])\s", (d.get("markdown") or "").strip(), maxsplit=1)[0][:200]
+            satirlar.append(f"- Başlık: {d.get('baslik', '')} | İlk cümle: {ilk}")
+        except Exception:
+            continue
+    return "\n".join(satirlar)
 
 
 def _get(path: str):
@@ -218,10 +267,13 @@ def yaz(urunler):
         f"Bugün {tarih}. Sabah dipci.tr'de market ve mağaza fiyatlarını taradın, şunları buldun:",
         bilgi,
         "Bunlardan gıdada, temizlikte, teknolojide ve günlük ihtiyaçlarda gerçekten hesaplı olanları anlatan bir köşe yazısı yaz (550–800 kelime). \"Dostlar,\" diye başla.",
+        "BUGÜNKÜ AÇILIŞIN: " + ACILISLAR[datetime.now().toordinal() % len(ACILISLAR)],
+        "Dünden bu sabaha Türkiye ve dünya gündemi (yalnız açılışa ya da yazıya gerçekten uyarsa birine değin; uymuyorsa hiç değinme, uydurma):\n" + (gundem() or "(gündem alınamadı)"),
+        "Son yazıların aşağıda; başlığın da ilk cümlen de bunlara BENZEMESİN. Başlıkta \"etiket\", \"raf\", \"fiyat\", \"sepet\", \"indirim\" kelimelerini kullanma; başlık hayattan, duygudan, açılıştaki hikâyeden gelsin:\n" + (onceki_yazilar() or "(yok)"),
         "Bugün birden ucuzlayan (şok indirim) ürünleri, aynı ürünün mağazalar arasındaki fiyat farkını ve kampanyaları dedektif gözüyle tart. Hepsini saymak zorunda değilsin; en anlamlı 5-7 tanesini seç.",
         "Her ürünün NE OLDUĞUNU okur ilk okuyuşta anlasın: ürün adını tek başına bırakma, cinsini cümlede söyle. Örnek: \"Ahmet Ümit'in Roma'nın Beş Günü romanı\", \"Ariel'in 4 kiloluk toz çamaşır deterjanı\", \"Philips'in airfryer'ı (yağsız fritöz)\". Kitapsa kitap/roman olduğunu ve yazarını, elektronikse ne cihaz olduğunu yaz. Ürün adındaki büyük-küçük harf hatalarını düzelt (Roma'Nın değil Roma'nın).",
         "Bahsettiğin her ürünün adını İLK geçtiği yerde markdown bağlantısı yap: [ürün adı](BAĞLANTI). Bağlantıyı aynen kullan, değiştirme. Başka bağlantı ekleme.",
-        "Başlık kısa ve merak uyandırıcı olsun (büyük harf değil). Spot tek cümle.",
+        "Başlık kısa, sıcak ve merak uyandırıcı olsun (büyük harf değil). Spot tek cümle.",
         "Metinde paragraflar arasında boş satır bırak. Yalnız JSON: {\"baslik\": \"\", \"spot\": \"\", \"metin\": \"\"}",
     ])
     cevap = gemini(KARAKTER, soru)
