@@ -39,6 +39,9 @@ from seo_engine import (
     CANONICAL_ORIGIN,
     CATEGORY_META,
     INDEXNOW_KEY,
+    SSR_CSS,
+    kategori_baglantilari,
+    kategori_listesi_html,
     key_to_slug,
     build_barcodes_sitemap_xml,
     build_categories_sitemap_xml,
@@ -444,10 +447,47 @@ def serve_spa_index(q: str = ""):
             description=desc,
             canonical_url=canon,
             json_ld_objects=build_organization_and_website_schema(),
+            ssr_html=_anasayfa_ssr(),
             initial_view="vitrin",
         ),
         headers=NO_CACHE_HTML_HEADERS,
     )
+
+
+_SSR_ONBELLEK: dict = {}
+
+
+def _ssr_onbellekli(anahtar: str, uret, sure: int = 1800) -> str:
+    """Sunucuda yazılan bağlantı blokları 30 dk saklanır (kategori sayfası her istekte veritabanını taramasın)."""
+    k = _SSR_ONBELLEK.get(anahtar)
+    if k and time.time() - k[0] < sure:
+        return k[1]
+    try:
+        v = uret()
+    except Exception:
+        v = ""
+    _SSR_ONBELLEK[anahtar] = (time.time(), v)
+    if len(_SSR_ONBELLEK) > 3000:
+        _SSR_ONBELLEK.clear()
+    return v
+
+
+def _kategori_ssr(db_cat: str, sayfa: int) -> str:
+    return _ssr_onbellekli(f"kat:{db_cat}:{sayfa}", lambda: kategori_listesi_html(db, db_cat, sayfa))
+
+
+def _anasayfa_ssr() -> str:
+    def uret():
+        import html as _h
+        rows = db.conn.execute(
+            "SELECT product_key, brand, family_name, best_pack_price, offer_count FROM product_catalog_index "
+            "WHERE offer_count >= 2 ORDER BY savings_pct DESC LIMIT 48").fetchall()
+        lis = "".join(
+            f'<li><a href="/urun/{key_to_slug(r["product_key"])}">{_h.escape((r["brand"] + " " + r["family_name"]).strip())}</a>'
+            f' <span class="f">· {int(r["offer_count"])} mağaza</span></li>' for r in rows)
+        return (f'{SSR_CSS}<section class="dpc-ssr" aria-label="Öne çıkan karşılaştırmalar">'
+                f'<h2>Mağazalar arasında en büyük fiyat farkı olan ürünler</h2><ul>{lis}</ul>{kategori_baglantilari()}</section>')
+    return _ssr_onbellekli("anasayfa", uret)
 
 
 @app.get("/urun/{slug}", response_class=HTMLResponse)
@@ -515,7 +555,7 @@ def serve_barcode_seo_page(gtin: str, request: Request):
 
 
 @app.get("/kategori/{cat_slug}", response_class=HTMLResponse)
-def serve_category_seo_page(cat_slug: str):
+def serve_category_seo_page(cat_slug: str, sayfa: int = 1):
     db_cat = cat_slug_to_db(cat_slug)
     if not db_cat:
         raise HTTPException(status_code=404, detail="Kategori bulunamadı.")
@@ -527,10 +567,11 @@ def serve_category_seo_page(cat_slug: str):
     return HTMLResponse(
         render_seo_hydrated_spa(
             _read_index_template(),
-            title=f"{meta['title']} | dipci.tr",
+            title=f"{meta['title']}{f' - Sayfa {sayfa}' if sayfa > 1 else ''} | dipci.tr",
             description=meta["desc"],
-            canonical_url=f"{CANONICAL_ORIGIN}/kategori/{meta['slug']}",
+            canonical_url=f"{CANONICAL_ORIGIN}/kategori/{meta['slug']}" + (f"?sayfa={sayfa}" if sayfa > 1 else ""),
             json_ld_objects=build_organization_and_website_schema(),
+            ssr_html=_kategori_ssr(db_cat, sayfa),
             initial_product_key=first_prod["product_key"] if first_prod else None,
             initial_view="vitrin",
         ),

@@ -141,6 +141,78 @@ def build_organization_and_website_schema() -> List[Dict]:
     ]
 
 
+# ---- Google'ın ilk okumada gördüğü iç bağlantılar (Kemal, 26 Kas 2026: "ürünlerin Google'da daha hızlı çıkması için çalış").
+# Sayfalar JavaScript ile çiziliyordu; ham HTML'de ürünler arası bağlantı yoktu (kategori sayfasında 0). Google yeni ürünü
+# yalnız site haritasından buluyor, sayfanın önemini de bağlantılardan ölçüyordu. Bu bloklar sunucuda yazılır, görünürdür.
+SSR_CSS = (
+    "<style>.dpc-ssr{max-width:72rem;margin:24px auto 96px;padding:0 16px;font-family:Inter,system-ui,sans-serif;color:#0f172a}"
+    ".dpc-ssr h2{font-size:15px;font-weight:700;margin:20px 0 10px}.dpc-ssr ul{list-style:none;padding:0;margin:0;"
+    "display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:6px 16px}.dpc-ssr li{font-size:13px;line-height:1.4}"
+    ".dpc-ssr a{color:#334155;text-decoration:none}.dpc-ssr a:hover{color:#059669;text-decoration:underline}"
+    ".dpc-ssr .f{color:#64748b;white-space:nowrap}.dpc-ssr nav{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:13px;margin-top:12px}"
+    "@media (min-width:768px){.dpc-ssr{margin-bottom:32px}}</style>"
+)
+KATEGORI_SAYFA_BOYU = 60
+KATEGORI_EN_COK_SAYFA = 200
+
+
+def _urun_li(r) -> str:
+    ad = html.escape(f"{r['brand']} {r['family_name']}".strip())
+    fiyat = f" <span class=\"f\">· {r['best_pack_price']:,.0f} TL".replace(",", ".") + (
+        f", {int(r['offer_count'])} mağaza" if int(r["offer_count"] or 0) >= 2 else "") + "</span>" if r["best_pack_price"] else ""
+    return f'<li><a href="/urun/{key_to_slug(r["product_key"])}">{ad}</a>{fiyat}</li>'
+
+
+def kategori_baglantilari() -> str:
+    return "<nav aria-label=\"Kategoriler\">" + "".join(
+        f'<a href="/kategori/{m["slug"]}">{html.escape(m["title"].split(" En Ucuz")[0])}</a>' for m in CATEGORY_META.values()
+    ) + "</nav>"
+
+
+def benzer_urunler_html(db: PriceMemoryDB, category: str, brand: str, haric: str, adet: int = 24) -> str:
+    """Ürün sayfasının altına: aynı markadan ve aynı kategoriden karşılaştırmalı ürünler."""
+    try:
+        rows = db.conn.execute(
+            "SELECT product_key, brand, family_name, best_pack_price, offer_count FROM product_catalog_index "
+            "WHERE brand = ? AND product_key <> ? AND offer_count >= 1 ORDER BY offer_count DESC LIMIT 8",
+            (brand, haric)).fetchall()
+        gorulen = {r["product_key"] for r in rows}
+        rows += [r for r in db.conn.execute(
+            "SELECT product_key, brand, family_name, best_pack_price, offer_count FROM product_catalog_index "
+            "WHERE category = ? AND product_key <> ? AND offer_count >= 1 ORDER BY offer_count DESC, savings_pct DESC LIMIT ?",
+            (category, haric, adet)).fetchall() if r["product_key"] not in gorulen][: adet - len(rows)]
+    except Exception:
+        rows = []
+    cat = CATEGORY_META.get(category)
+    kat_link = (f'<p style="font-size:13px;margin:8px 0 0"><a href="/kategori/{cat["slug"]}">'
+                f'{html.escape(cat["title"].split(" En Ucuz")[0])} kategorisindeki tüm ürünler →</a></p>') if cat else ""
+    if not rows:
+        return ""
+    return (f'{SSR_CSS}<section class="dpc-ssr" aria-label="Benzer ürünler"><h2>Benzer ürünlerin fiyat karşılaştırması</h2>'
+            f'<ul>{"".join(_urun_li(r) for r in rows)}</ul>{kat_link}{kategori_baglantilari()}</section>')
+
+
+def kategori_listesi_html(db: PriceMemoryDB, category: str, sayfa: int) -> str:
+    """Kategori sayfasına: sunucuda yazılmış, sayfalı ürün listesi (karşılaştırmalı ürünler önde)."""
+    cat = CATEGORY_META[category]
+    toplam = db.conn.execute("SELECT COUNT(*) FROM product_catalog_index WHERE category = ? AND offer_count >= 1",
+                             (category,)).fetchone()[0]
+    son = max(1, min(KATEGORI_EN_COK_SAYFA, (toplam + KATEGORI_SAYFA_BOYU - 1) // KATEGORI_SAYFA_BOYU))
+    sayfa = max(1, min(sayfa, son))
+    rows = db.conn.execute(
+        "SELECT product_key, brand, family_name, best_pack_price, offer_count FROM product_catalog_index "
+        "WHERE category = ? AND offer_count >= 1 ORDER BY offer_count DESC, savings_pct DESC, product_key LIMIT ? OFFSET ?",
+        (category, KATEGORI_SAYFA_BOYU, (sayfa - 1) * KATEGORI_SAYFA_BOYU)).fetchall()
+    def url(n): return f"/kategori/{cat['slug']}" + (f"?sayfa={n}" if n > 1 else "")
+    sayfalar = sorted({1, 2, 3, sayfa - 2, sayfa - 1, sayfa, sayfa + 1, sayfa + 2, son} & set(range(1, son + 1)))
+    gezinme = "".join(f'<a href="{url(n)}"' + (' aria-current="page" style="font-weight:700;color:#059669"' if n == sayfa else "")
+                      + f">{n}</a>" for n in sayfalar)
+    baslik = html.escape(cat["title"].split(" En Ucuz")[0])
+    return (f'{SSR_CSS}<section class="dpc-ssr" aria-label="{baslik} ürünleri"><h2>{baslik}: fiyatı karşılaştırılan ürünler'
+            f'{" (sayfa " + str(sayfa) + ")" if sayfa > 1 else ""}</h2><ul>{"".join(_urun_li(r) for r in rows)}</ul>'
+            f'<nav aria-label="Sayfalar">{gezinme}</nav>{kategori_baglantilari()}</section>')
+
+
 def build_product_seo_bundle(
     db: PriceMemoryDB,
     audit_engine: MarketDedektifiAuditEngine,
@@ -182,7 +254,8 @@ def build_product_seo_bundle(
         full_name = f"{full_name} ({prod['official_model_code']})"
 
     if focused_gtin:
-        canonical_url = f"{CANONICAL_ORIGIN}/barkod/{focused_gtin}"
+        # Barkod sayfası ürün sayfasının kopyası: Google'a asıl adres /urun/ gösterilir (760 bin kopya adres tarama payını yiyordu, 26 Kas)
+        canonical_url = f"{CANONICAL_ORIGIN}/urun/{slug}"
         page_title = (
             f"{focused_gtin} Barkodlu {full_name} En Ucuz Fiyatı "
             f"({low_pack:,.2f} TL) | dipci.tr"
@@ -318,7 +391,7 @@ def build_product_seo_bundle(
       <h2>Mağaza Fiyat Karşılaştırma Listesi</h2>
       <ul>{ssr_offers_li}</ul>
     </section>
-    """
+    """ + benzer_urunler_html(db, prod["category"], prod["brand"], product_key)
 
     return {
         "product_key": product_key,
@@ -493,9 +566,7 @@ def build_sitemap_index_xml(db: Optional[PriceMemoryDB] = None) -> str:
     for p in range(1, prod_pages + 1):
         suffix = "" if p == 1 else f"-{p}"
         locs.append(f"{CANONICAL_ORIGIN}/sitemap-products{suffix}.xml")
-    for p in range(1, bc_pages + 1):
-        suffix = "" if p == 1 else f"-{p}"
-        locs.append(f"{CANONICAL_ORIGIN}/sitemap-barcodes{suffix}.xml")
+    # Barkod sayfaları /urun/ sayfasına kanonik (26 Kas): haritaya konmaz
 
     nodes = "\n".join(
         f"""  <sitemap>
@@ -545,7 +616,7 @@ def build_products_sitemap_xml(db: PriceMemoryDB, page: int = 1) -> str:
     offset = max(0, (page - 1) * SITEMAP_PAGE_SIZE)
     rows = db.conn.execute(
         """
-        SELECT product_key, offer_count
+        SELECT product_key, offer_count, updated_at
         FROM product_catalog_index
         WHERE offer_count >= 1
         ORDER BY CASE WHEN offer_count >= 2 THEN 1 ELSE 0 END DESC,
@@ -560,7 +631,8 @@ def build_products_sitemap_xml(db: PriceMemoryDB, page: int = 1) -> str:
         [
             {
                 "loc": f"{CANONICAL_ORIGIN}/urun/{key_to_slug(r['product_key'])}",
-                "lastmod": today,
+                # Google lastmod'u yalnız doğruysa dikkate alır: her gün "bugün" yazmak yerine fiyatın son güncellendiği gün
+                "lastmod": (r["updated_at"] or today)[:10],
                 "changefreq": "hourly" if int(r["offer_count"] or 0) >= 2 else "daily",
                 "priority": "0.95" if int(r["offer_count"] or 0) >= 2 else "0.75",
             }
