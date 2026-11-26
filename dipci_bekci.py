@@ -45,7 +45,7 @@ MAX_RUNTIME_SEC: Dict[str, int] = {
 
 WAL_PASSIVE_MB = 300.0
 WAL_TRUNCATE_MB = 900.0
-WORKER_MAX_RSS_MB = 4600.0
+WORKER_MAX_RSS_MB = 6000.0  # yalnız gerçek (anonim) bellek; sunucu 48 GB (27 Kas)
 HTTP_TIMEOUT_SEC = 7.5
 
 
@@ -113,8 +113,22 @@ def kill_runaway_jobs() -> List[str]:
     return killed
 
 
+def _anon_mb(pid: int, varsayilan: float) -> float:
+    """RSS veritabanı dosyasının bellek eşlemesini (mmap) de sayar; o bellek gerçek tüketim değildir.
+    Yalnız anonim belleği (RssAnon) ölç (27 Kas 2026: yanlış alarm her 5 dk siteyi yeniden başlatıp aktarımları kesiyordu)."""
+    try:
+        for satir in open(f"/proc/{pid}/status", encoding="utf-8"):
+            if satir.startswith("RssAnon:"):
+                return int(satir.split()[1]) / 1024.0
+    except Exception:
+        pass
+    return varsayilan
+
+
 def check_worker_memory() -> bool:
     for pid, etimes, rss_mb, cmd in _list_dipci_processes():
+        if ("uvicorn" in cmd or "multiprocessing.spawn" in cmd):
+            rss_mb = _anon_mb(pid, rss_mb)
         if ("uvicorn" in cmd or "multiprocessing.spawn" in cmd) and rss_mb > WORKER_MAX_RSS_MB:
             _log(f"UYARI: Web işçisi PID {pid} yüksek bellek kullanıyor ({rss_mb:.0f} MB > {WORKER_MAX_RSS_MB:.0f} MB)")
             return True
@@ -293,8 +307,9 @@ def main() -> None:
     if unhealthy or high_mem:
         reason = f"home={home_st}({home_ms}ms) api={api_st}({api_ms}ms) high_mem={high_mem}"
         _log(f"ALARM: Sağlık eşiği aşıldı ({reason}) — otomatik onarım başlatılıyor.")
-        stop_active_batch_writers()
-        run_wal_checkpoint("TRUNCATE")
+        if unhealthy:  # yalnız bellek yüksekse arka plan aktarımları kesilmez, yalnız web yeniden başlar (27 Kas)
+            stop_active_batch_writers()
+            run_wal_checkpoint("TRUNCATE")
         restart_dipci_service()
         actions.append(f"auto_restarted:{reason}")
 
