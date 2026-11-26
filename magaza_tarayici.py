@@ -144,9 +144,9 @@ class MagazaTarayici:
             ev = tunel_acik()
         except Exception:
             ev = False
-        if ev:  # önce Kemal'in ev interneti (18 Kas 2026), yoksa ISP proxy'si
+        if ev:  # Kemal'in ev interneti (18 Kas 2026; 27 Kas: "nadiren ihtiyacınız olduğunda benim internetimi kullanın")
             proxy = {"server": f"http://127.0.0.1:{EV_PORT}"}
-        elif tr:
+        elif tr and os.getenv("TR_PROXY_AKTIF", "") == "1":  # ücretli proxy 24 Kas'ta bitti, yenilenmedi: kapalıyken doğrudan gidilir
             u = urllib.parse.urlsplit(tr)
             proxy = {"server": f"http://{u.hostname}:{u.port}",
                      "username": urllib.parse.unquote(u.username or ""), "password": urllib.parse.unquote(u.password or "")}
