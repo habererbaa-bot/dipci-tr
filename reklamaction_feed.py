@@ -26,7 +26,28 @@ from auto_catalog import AutoCatalogEngine, classify_category  # noqa: E402
 from memory_db import PriceMemoryDB  # noqa: E402
 
 G = "{http://base.google.com/ns/1.0}"
+# Bekçi bir çalışmayı 75 dk'da keser; Koçtaş tek başına saatler sürer (28 Kas). Her çalışma 65 dk'da temiz durur,
+# kaldığı yeri DURUM dosyasına yazar, sonraki çalışma oradan sürer; mağazalar en uzun süredir yenilenmeyenden başlar.
+SURE_BUTCESI = 65 * 60
+_BASLANGIC = time.time()
 KLASOR = KOK / "data" / "reklamaction"
+DURUM = KLASOR / "durum.json"
+
+
+def _durum() -> dict:
+    try:
+        return json.loads(DURUM.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _durum_yaz(d: dict) -> None:
+    KLASOR.mkdir(parents=True, exist_ok=True)
+    DURUM.write_text(json.dumps(d, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def _sure_bitti() -> bool:
+    return time.time() - _BASLANGIC > SURE_BUTCESI
 
 # feed dosyası -> (platform anahtarı, mağaza adı, dipci kategorisi; "" = ürüne göre)
 MAGAZALAR = {
@@ -131,7 +152,12 @@ def oku(yol: Path):
 def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
     platform, magaza_adi, sabit_kat = MAGAZALAR[dosya]
     t0 = time.time()
-    yol = indir(dosya, token)
+    durum = _durum()
+    kayit = durum.get(dosya) or {}
+    devam = int(kayit.get("devam") or 0)  # yarıda kalan aktarımın kaldığı sıra
+    yol = indir(dosya, token) if not devam else (KLASOR / f"{dosya}.xml.gz")
+    if devam and not yol.exists():
+        devam, yol = 0, indir(dosya, token)
     # 1) Beden/renk kopyalarını birleştir: her ürün için en düşük fiyat
     urunler = {}
     okunan = 0
@@ -155,7 +181,17 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
     motor = AutoCatalogEngine(db)
     yazilan = 0
     degisen = []
+    yarim = False
+    i = 0
     for i, u in enumerate(urunler.values(), 1):
+        if i <= devam:
+            continue
+        if _sure_bitti():
+            yarim = True
+            break
+        if i % 2000 == 0:
+            durum[dosya] = {"devam": i, "son": kayit.get("son", 0)}
+            _durum_yaz(durum)
         kategori = sabit_kat or _kategori(u["tip"], f"{u['marka']} {u['ad']}")
         teklif = [{"platform": platform, "seller_name": magaza_adi, "title": u["ad"], "price": u["fiyat_son"],
                    "unit_price_text": "", "url": u["link"], "is_direct_product": True, "is_branch_only": False,
@@ -178,8 +214,11 @@ def aktar(dosya: str, token: str, sinir: int = 0) -> dict:
             db.conn.commit()
     db.conn.commit()
     db.rebuild_catalog_index(degisen)  # yalnız bu mağazanın ürünleri, 400'lük parçalarla
+    durum = _durum()
+    durum[dosya] = {"devam": i, "son": kayit.get("son", 0)} if yarim else {"devam": 0, "son": time.time()}
+    _durum_yaz(durum)
     return {"magaza": magaza_adi, "feed_satir": okunan, "tekil_urun": len(urunler), "yazilan": yazilan,
-            "sure_sn": round(time.time() - t0)}
+            "sure_sn": round(time.time() - t0), "yarim_kaldi": yarim}
 
 
 def _token() -> str:
@@ -202,8 +241,14 @@ if __name__ == "__main__":
     a = ap.parse_args()
     tok = _token()
     secilen = [m for m in (a.magaza.split(",") if a.magaza else MAGAZALAR) if m in MAGAZALAR]
+    d = _durum()
+    # Yarıda kalan önce, sonra en uzun süredir yenilenmeyen
+    secilen.sort(key=lambda m: (0 if (d.get(m) or {}).get("devam") else 1, (d.get(m) or {}).get("son", 0)))
     sonuc = []
     for m in secilen:
+        if _sure_bitti():
+            print(json.dumps({"durdu": "süre bütçesi doldu, kalanlar sonraki çalışmada"}, ensure_ascii=False), flush=True)
+            break
         try:
             r = aktar(m, tok, a.sinir)
         except Exception as e:
